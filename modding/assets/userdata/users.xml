@@ -1,0 +1,390 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Root>
+  <CurrentUser ID="1" Language="eng" GraphicsSettings="Default" TexturesQuality="High" LocationsQuality="High" LastSaveSlot="0">
+    <Sounds>
+      <Sound Value="1" Mute="0" />
+      <Music Value="1" Mute="0" />
+    </Sounds>
+    <WatchedVideos />
+  </CurrentUser>
+  <Warriors>
+    <Warrior ID="1" FirstName="NAME_SHADOW" Avatar="avatar_hero" Voice="Male" Money="25170" Bonus="100" Strength="3" Stamina="3" Level="3" Experience="20" Power="1000" PowerSyncTime="1378445901" Difficulty="50" LastLotteryEnterTime="0" LastLotteryPlayTime="0" LotteryDaysMax="6" LotteryDays="0" RateTime="0" Skeleton="Skeleton" Armor="Body" Helm="Head" Weapon="WEAPON_KNIVES" Ranged="NoRanged" Magic="NoMagic" ShowUpgrades="0" ArenaRating="0" ArenaRank="0" Tutorial="END" Tactic="Player" CurrentZone="ZONE_1" PaymentActionsResendRequestCompleted="1" SaveSlot="0" InstallID="1006007388" ServerUserID="1326904825" AskedForDumps="1" Language="eng" RaidTutorialStep="" RaidTutorialGemsTaken="" ClanTutorial="" RaidTop100Focus="CurrentTop" RaidRemindRandomRule="1" RemindClanRaidLeave="1" RemindClanRaidKick="1" RaidRemindNewKeys="0" RemindNewShards="0" RaidToggleIsVisible="0" ShowBuyConsumablesConfirmation="1" RemindResetClanRaiting="1" UnconfirmedLedgerIDs="" FightIDS="ZONE_1|BOSS_LYNX|1" MapFocus="ZONE_1|Tournament">
+      <Items>
+        <Item Name="Body" Equipped="1" Count="1" UpgradeLevel="0" DeliveryTime="0" DeliveryUpgradeLevel="-1" AcquireType="Item" />
+        <Item Name="Head" Equipped="1" Count="1" UpgradeLevel="0" DeliveryTime="0" DeliveryUpgradeLevel="-1" AcquireType="Item" />
+        <Item Name="Fists" Equipped="0" Count="1" UpgradeLevel="0" DeliveryTime="0" DeliveryUpgradeLevel="-1" AcquireType="Item" />
+        <Item Name="NoRanged" Equipped="1" Count="1" UpgradeLevel="0" DeliveryTime="0" DeliveryUpgradeLevel="-1" AcquireType="Item" />
+        <Item Name="NoMagic" Equipped="1" Count="1" UpgradeLevel="0" DeliveryTime="0" DeliveryUpgradeLevel="-1" AcquireType="Item" />
+        <Item Name="WEAPON_KNIVES" Equipped="1" Count="1" UpgradeLevel="300" DeliveryTime="-1" DeliveryUpgradeLevel="-1" AcquireType="Upgrade" />
+      </Items>
+      <Battles>
+        <Battle Name="ZONE_1|Tournament|" Locked="0" Hidden="0" ReplayCount="0" />
+        <Battle Name="ZONE_1|Survival|" Locked="0" />
+        <Battle Name="ZONE_1|BOSS_LYNX|" Locked="0" />
+      </Battles>
+      <Currencies />
+      <Resistances Resistance_2="0" />
+      <Counters>
+        <Counter Name="FirstHits" CurrentValue="4" />
+        <Counter Name="Unarmed" CurrentValue="1" />
+        <Counter Name="HeadHitRound" CurrentValue="1" />
+        <Counter Name="Disarm" CurrentValue="1" />
+        <Counter Name="BlockedRound" CurrentValue="1" />
+        <Counter Name="FastRounds" CurrentValue="1" />
+        <Counter Name="BodyguardsWin" CurrentValue="1" />
+      </Counters>
+      <Achievements />
+      <RepostAchievements>
+        <RepostAchievement Name="achievement_name_firsthits_1" />
+        <RepostAchievement Name="achievement_name_unarmed_1" />
+        <RepostAchievement Name="achievement_name_headhitrounds_1" />
+        <RepostAchievement Name="achievement_name_disarm_1" />
+        <RepostAchievement Name="achievement_name_blockedrounds_1" />
+        <RepostAchievement Name="achievement_name_fastrounds_1" />
+      </RepostAchievements>
+      <ActiveLotteries />
+      <Timers />
+      <MapButtons>
+        <Button Name="LocalDaily" Image="UI/Atlases/RaidMap.fire" Type="Image" X="-876" Y="245" AnchorMinX="1" AnchorMinY="0.5" AnchorMaxX="1" AnchorMaxY="0.5" PivotX="0.5" PivotY="0.5" ImagePath="Textures/buttons/map/" Timer="0" ShowType="Story" ImageScale="1.1" />
+      </MapButtons>
+      <Payments>
+        <MetadataCache />
+      </Payments>
+      <Advertising />
+      <Offers />
+      <LocalDaily ResetTimer="1790737200">
+        <Data Id="1" Count="0" Claimed="False" />
+        <Data Id="2" Count="0" Claimed="False" />
+        <Data Id="3" Count="0" Claimed="False" />
+      </LocalDaily>
+      <Quests>
+        <Variables>
+          <Variable Name="EventStart" Value="1790060400" />
+          <Variable Name="EventPhase2" Value="1790233200" />
+          <Variable Name="EventPhase3" Value="1790406000" />
+          <Variable Name="EventPhase4" Value="1790578800" />
+          <Variable Name="EventEnd" Value="1790924400" />
+          <Variable Name="EventIndex" Value="260922" />
+          <Variable Name="EventGift" Value="EventGift_260922" />
+          <Variable Name="TowerStart" Value="1790406000" />
+          <Variable Name="TowerEnd" Value="1790924400" />
+          <Variable Name="MiniEventGift" Value="EventGift260526" />
+          <Variable Name="MiniEventStart" Value="1778572800" />
+          <Variable Name="MiniEventEnd" Value=" 1778572800" />
+          <Variable Name="MiniEventIndex" Value="260526" />
+          <Variable Name="OfferDisenabled" Value="1" />
+          <Variable Name="DailyOffersEnabled" Value="1" />
+          <Variable Name="NotEnoughCurrencyColor" Value="#9b1c07" />
+          <Variable Name="AutoShowRaidDailyWindow" Value="1" />
+          <Variable Name="SurvivalRestartLimitPerFight" Value="1" />
+          <Variable Name="SurvivalRestartTimerValue" Value="5" />
+          <Variable Name="JuniorLotteryTime" Value="86400" />
+          <Variable Name="EventOfferCD" Value="86400" />
+          <Variable Name="Event_CoinsOffer_1_Start" Value="1790838000" />
+          <Variable Name="Event_CoinsOffer_1_End" Value="1790924400" />
+          <Variable Name="Event_CoinsOffer_2_Start" Value="0" />
+          <Variable Name="Event_CoinsOffer_2_End" Value="0" />
+          <Variable Name="Event_KeysOffer_1_Start" Value="1790146800" />
+          <Variable Name="Event_KeysOffer_1_End" Value="1790233200" />
+          <Variable Name="Event_KeysOffer_2_Start" Value="1790406000" />
+          <Variable Name="Event_KeysOffer_2_End" Value="1790492400" />
+          <Variable Name="Event_KeysOffer_3_Start" Value="1790665200" />
+          <Variable Name="Event_KeysOffer_3_End" Value="1790751600" />
+          <Variable Name="SFest26_KeyOffer_1_Start" Value="1786140000" />
+          <Variable Name="SFest26_KeyOffer_1_End" Value="1786226399" />
+          <Variable Name="SFest26_KeyOffer_2_Start" Value="1786744800" />
+          <Variable Name="SFest26_KeyOffer_2_End" Value="1786831199" />
+          <Variable Name="SFest26_KeyOffer_3_Start" Value="1787349600" />
+          <Variable Name="SFest26_KeyOffer_3_End" Value="1787435999" />
+          <Variable Name="SFest26_KeyOffer_4_Start" Value="1787695200" />
+          <Variable Name="SFest26_KeyOffer_4_End" Value="1787781600" />
+          <Variable Name="SFest26_CoinsOffer_1_Start" Value="1786572000" />
+          <Variable Name="SFest26_CoinsOffer_1_End" Value="1786658399" />
+          <Variable Name="SFest26_CoinsOffer_2_Start" Value="1787176800" />
+          <Variable Name="SFest26_CoinsOffer_2_End" Value="1787263199" />
+          <Variable Name="SummerFest26Offer_Helm_Start" Value="1787263200" />
+          <Variable Name="SummerFest26Offer_Helm_End" Value="1787522400" />
+          <Variable Name="SummerFest26Offer_Helm_Enabled" Value="1" />
+          <Variable Name="SummerFest26Offer_Weapon_Start" Value="1787522400" />
+          <Variable Name="SummerFest26Offer_Weapon_End" Value="1787781600" />
+          <Variable Name="SummerFest26Offer_Weapon_Enabled" Value="1" />
+          <Variable Name="EventOffer1_Start" Value="1737180000" />
+          <Variable Name="EventOffer1_End" Value="1748266400" />
+          <Variable Name="EventOffer2_Start" Value="1735376400" />
+          <Variable Name="EventOffer2_End" Value="1735498800" />
+          <Variable Name="EventOfferKeysConsumables_Start" Value="1744448400" />
+          <Variable Name="EventOfferKeysConsumables_End" Value="1744588500" />
+          <Variable Name="EventOffer3_Start" Value="1737266400" />
+          <Variable Name="EventOffer3_End" Value="1737352800" />
+          <Variable Name="WeeklyOffer_24_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_24_Start" Value="1746435600" />
+          <Variable Name="WeeklyOffer_24_End" Value="1747007700" />
+          <Variable Name="WeeklyOffer_25_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_25_Start" Value="1747040400" />
+          <Variable Name="WeeklyOffer_25_End" Value="1747612500" />
+          <Variable Name="WeeklyOffer_26_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_26_Start" Value="1747645200" />
+          <Variable Name="WeeklyOffer_26_End" Value="1748217300" />
+          <Variable Name="WeeklyOffer_27_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_27_Start" Value="1748250000" />
+          <Variable Name="WeeklyOffer_27_End" Value="1748822100" />
+          <Variable Name="WeeklyOffer_28_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_28_Start" Value="1748854800" />
+          <Variable Name="WeeklyOffer_28_End" Value="1749426900" />
+          <Variable Name="WeeklyOffer_29_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_29_Start" Value="1749459600" />
+          <Variable Name="WeeklyOffer_29_End" Value="1750031700" />
+          <Variable Name="WeeklyOffer_30_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_30_Start" Value="1750064400" />
+          <Variable Name="WeeklyOffer_30_End" Value="1750636500" />
+          <Variable Name="WeeklyOffer_31_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_31_Start" Value="1750669200" />
+          <Variable Name="WeeklyOffer_31_End" Value="1751241300" />
+          <Variable Name="WeeklyOffer_32_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_32_Start" Value="1751274000" />
+          <Variable Name="WeeklyOffer_32_End" Value="1751846100" />
+          <Variable Name="WeeklyOffer_33_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_33_Start" Value="1751878800" />
+          <Variable Name="WeeklyOffer_33_End" Value="1752450900" />
+          <Variable Name="WeeklyOffer_34_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_34_Start" Value="1752483600" />
+          <Variable Name="WeeklyOffer_34_End" Value="1753055700" />
+          <Variable Name="WeeklyOffer_35_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_35_Start" Value="1753088400" />
+          <Variable Name="WeeklyOffer_35_End" Value="1753660500" />
+          <Variable Name="WeeklyOffer_36_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_36_Start" Value="1753693200" />
+          <Variable Name="WeeklyOffer_36_End" Value="1754265300" />
+          <Variable Name="WeeklyOffer_37_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_37_Start" Value="1754298000" />
+          <Variable Name="WeeklyOffer_37_End" Value="1754870100" />
+          <Variable Name="WeeklyOffer_summerfest25_1_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_summerfest25_1_Start" Value="1754902800" />
+          <Variable Name="WeeklyOffer_summerfest25_1_End" Value="1755474900" />
+          <Variable Name="WeeklyOffer_summerfest25_2_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_summerfest25_2_Start" Value="1755507600" />
+          <Variable Name="WeeklyOffer_summerfest25_2_End" Value="1756079700" />
+          <Variable Name="WeeklyOffer_summerfest25_3_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_summerfest25_3_Start" Value="1756112400" />
+          <Variable Name="WeeklyOffer_summerfest25_3_End" Value="1756684500" />
+          <Variable Name="WeeklyOffer_38_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_38_Start" Value="1757898000" />
+          <Variable Name="WeeklyOffer_38_End" Value="1758495600" />
+          <Variable Name="WeeklyOffer_39_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_39_Start" Value="1760922000" />
+          <Variable Name="WeeklyOffer_39_End" Value="1761522900" />
+          <Variable Name="WeeklyOffer_40_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_40_Start" Value="1761782460" />
+          <Variable Name="WeeklyOffer_40_End" Value="1762387140" />
+          <Variable Name="WeeklyOffer_41_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_41_Start" Value="1766534460" />
+          <Variable Name="WeeklyOffer_41_End" Value="1767139140" />
+          <Variable Name="WeeklyOffer_42_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_42_Start" Value="1771981200" />
+          <Variable Name="WeeklyOffer_42_End" Value="1772582100" />
+          <Variable Name="WeeklyOffer_43_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_43_Start" Value="1776038400" />
+          <Variable Name="WeeklyOffer_43_End" Value="1776643200" />
+          <Variable Name="WeeklyOffer_44_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_44_Start" Value="1777248000" />
+          <Variable Name="WeeklyOffer_44_End" Value="1777852800" />
+          <Variable Name="WeeklyOffer_45_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_45_Start" Value="1778457600" />
+          <Variable Name="WeeklyOffer_45_End" Value="1779062400" />
+          <Variable Name="WeeklyOffer_46_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_46_Start" Value="1779667200" />
+          <Variable Name="WeeklyOffer_46_End" Value="1780272000" />
+          <Variable Name="WeeklyOffer_47_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_47_Start" Value="1780876800" />
+          <Variable Name="WeeklyOffer_47_End" Value="1781481600" />
+          <Variable Name="WeeklyOffer_48_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_48_Start" Value="1782086400" />
+          <Variable Name="WeeklyOffer_48_End" Value="1782691200" />
+          <Variable Name="WeeklyOffer_49_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_49_Start" Value="1783296000" />
+          <Variable Name="WeeklyOffer_49_End" Value="1783900800" />
+          <Variable Name="WeeklyOffer_50_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_50_Start" Value="1784505600" />
+          <Variable Name="WeeklyOffer_50_End" Value="1785110400" />
+          <Variable Name="WeeklyOffer_51_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_51_Start" Value="1785715200" />
+          <Variable Name="WeeklyOffer_51_End" Value="1786320000" />
+          <Variable Name="WeeklyOffer_52_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_52_Start" Value="1786924800" />
+          <Variable Name="WeeklyOffer_52_End" Value="1787529600" />
+          <Variable Name="WeeklyOffer_53_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_53_Start" Value="1788220800" />
+          <Variable Name="WeeklyOffer_53_End" Value="1788825600" />
+          <Variable Name="WeeklyOffer_54_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_54_Start" Value="1789336800" />
+          <Variable Name="WeeklyOffer_54_End" Value="1789941600" />
+          <Variable Name="WeeklyOffer_55_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_55_Start" Value="1790546400" />
+          <Variable Name="WeeklyOffer_55_End" Value="1791151200" />
+          <Variable Name="WeeklyOffer_56_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_56_Start" Value="1791756000" />
+          <Variable Name="WeeklyOffer_56_End" Value="1792360800" />
+          <Variable Name="WeeklyOffer_57_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_57_Start" Value="1792969200" />
+          <Variable Name="WeeklyOffer_57_End" Value="1793574000" />
+          <Variable Name="WeeklyOffer_58_Enabled" Value="1" />
+          <Variable Name="WeeklyOffer_58_Start" Value="1794178800" />
+          <Variable Name="WeeklyOffer_58_End" Value="1794783600" />
+          <Variable Name="MAFest26Offer_WeaponDynastySword_Enabled" Value="1" />
+          <Variable Name="MAFest26Offer_WeaponDynastySword_Start" Value="1790838000" />
+          <Variable Name="MAFest26Offer_WeaponDynastySword_End" Value="1791097200" />
+          <Variable Name="MAFest26Offer_WeaponBringerOfOpulence_Enabled" Value="1" />
+          <Variable Name="MAFest26Offer_WeaponBringerOfOpulence_Start" Value="1791097200" />
+          <Variable Name="MAFest26Offer_WeaponBringerOfOpulence_End" Value="1791270000" />
+          <Variable Name="MAFest26Offer_WeaponDeathGou_Enabled" Value="1" />
+          <Variable Name="MAFest26Offer_WeaponDeathGou_Start" Value="1791270000" />
+          <Variable Name="MAFest26Offer_WeaponDeathGou_End" Value="1791442800" />
+          <Variable Name="MAFest26Offer_HelmChengziguan_Enabled" Value="1" />
+          <Variable Name="MAFest26Offer_HelmChengziguan_Start" Value="1791442800" />
+          <Variable Name="MAFest26Offer_HelmChengziguan_End" Value="1791615600" />
+          <Variable Name="MAFest26Offer_MagicGreenDragonRay_Enabled" Value="1" />
+          <Variable Name="MAFest26Offer_MagicGreenDragonRay_Start" Value="1791615600" />
+          <Variable Name="MAFest26Offer_MagicGreenDragonRay_End" Value="1791788400" />
+          <Variable Name="MAFest26Offer_RangedLotusMine_Enabled" Value="1" />
+          <Variable Name="MAFest26Offer_RangedLotusMine_Start" Value="1791788400" />
+          <Variable Name="MAFest26Offer_RangedLotusMine_End" Value="1791961200" />
+          <Variable Name="FreeReminderShown" Value="0" />
+          <Variable Name="UpgradeToLevelReminderShown" Value="0" />
+          <Variable Name="LowFpsWarningShown" Value="0" />
+          <Variable Name="ScriptsResumed" Value="1" />
+          <Variable Name="GDPROnStartAccepted" Value="1" />
+          <Variable Name="lang_FirstLaunch_Shown" Value="1" />
+          <Variable Name="TimeSet" Value="1" />
+          <Variable Name="LastRatingOfferTime" Value="0" />
+          <Variable Name="SurvivalsInARowCount" Value="0" />
+          <Variable Name="BestAcquiredWeaponLevel" Value="100" />
+          <Variable Name="Ambush1400" Value="1" />
+          <Variable Name="globZoneToCheck" Value="ZONE_1" />
+          <Variable Name="CurrentZone" Value="ZONE_1" />
+          <Variable Name="Avatar_Notification" Value="character_may_1_small" />
+          <Variable Name="Avatar_Assistant_1" Value="character_may_1" />
+          <Variable Name="Avatar_Assistant_2" Value="character_may_2" />
+          <Variable Name="Avatar_Assistant_3" Value="character_may_3" />
+          <Variable Name="Avatar_Assistant_4" Value="character_may_4" />
+          <Variable Name="Avatar_Assistant_5" Value="character_may_5" />
+          <Variable Name="Avatar_Assistant_6" Value="character_sensei" />
+          <Variable Name="Title_Assistant" Value="characterMay" />
+          <Variable Name="Title_Assistant_2" Value="characterSensei" />
+          <Variable Name="promo_FirstPayment_Image" Value="Payment2.img_pile_coins" />
+          <Variable Name="promo_Multiplier" Value="1.3" />
+          <Variable Name="NoDiscountsControlGroupRoll" Value="44" />
+          <Variable Name="ChallengeUnlockCount" Value="0" />
+          <Variable Name="DuelUnlockCount" Value="0" />
+          <Variable Name="StrangerTriggerLevel" Value="5" />
+          <Variable Name="ShowPostTutorDialog" Value="1" />
+          <Variable Name="rnd100" Value="57" />
+          <Variable Name="LevelUpProfileFlag" Value="1" />
+          <Variable Name="WorseWeaponEquippedReminderFlag" Value="0" />
+          <Variable Name="ShopAdviceOnCurrentLevel" Value="0" />
+          <Variable Name="WorseArmorEquippedReminderFlag" Value="0" />
+          <Variable Name="WorseHelmEquippedReminderFlag" Value="0" />
+          <Variable Name="ActiveDiscount" Value="0" />
+        </Variables>
+        <Quests>
+          <Quest Name="DownloadPacksStart" FileName="quest_extensions/packs.xml">
+            <QuestParameters ScreenIndex="5" ChekPointIndex="0">
+              <FightResult Name="" />
+              <RaidResult Name="" />
+              <Fight Name="" />
+              <LevelUp Value="0" />
+              <PowerAmount Value="0" />
+              <FightAvgFPS Value="0" />
+            </QuestParameters>
+          </Quest>
+        </Quests>
+      </Quests>
+      <Fights>
+        <Fight ID="-1" IDS="ZONE_1|Duel|1" CompletedCount="0" LossCount="0" EclipseCompletedCount="0" EclipseLossCount="0" StoryCount="0" CompletedTime="0" TimeLeft="0" RandomizeTimeLeft="1790715733" Level="0" RandomGroupSeed="1648317696" RandomRuleSeed="574171264" />
+        <Fight ID="-1" IDS="ZONE_1|Duel_INTERMISSION|1" CompletedCount="0" LossCount="0" EclipseCompletedCount="0" EclipseLossCount="0" StoryCount="0" CompletedTime="0" TimeLeft="0" RandomizeTimeLeft="1790715733" Level="0" RandomGroupSeed="93928392" RandomRuleSeed="1960740352" />
+        <Fight ID="-1" IDS="ZONE_2|Duel|1" CompletedCount="0" LossCount="0" EclipseCompletedCount="0" EclipseLossCount="0" StoryCount="0" CompletedTime="0" TimeLeft="0" RandomizeTimeLeft="1790715733" Level="0" RandomGroupSeed="993515136" RandomRuleSeed="1940727040" />
+        <Fight ID="-1" IDS="ZONE_2|Duel_INTERMISSION|1" CompletedCount="0" LossCount="0" EclipseCompletedCount="0" EclipseLossCount="0" StoryCount="0" CompletedTime="0" TimeLeft="0" RandomizeTimeLeft="1790715733" Level="0" RandomGroupSeed="594463424" RandomRuleSeed="1925717120" />
+        <Fight ID="-1" IDS="ZONE_3|Duel|1" CompletedCount="0" LossCount="0" EclipseCompletedCount="0" EclipseLossCount="0" StoryCount="0" CompletedTime="0" TimeLeft="0" RandomizeTimeLeft="1790715733" Level="0" RandomGroupSeed="790880064" RandomRuleSeed="2075513472" />
+        <Fight ID="-1" IDS="ZONE_3|Duel_INTERMISSION|1" CompletedCount="0" LossCount="0" EclipseCompletedCount="0" EclipseLossCount="0" StoryCount="0" CompletedTime="0" TimeLeft="0" RandomizeTimeLeft="1790715733" Level="0" RandomGroupSeed="518516704" RandomRuleSeed="906860224" />
+        <Fight ID="-1" IDS="ZONE_4|Duel|1" CompletedCount="0" LossCount="0" EclipseCompletedCount="0" EclipseLossCount="0" StoryCount="0" CompletedTime="0" TimeLeft="0" RandomizeTimeLeft="1790715733" Level="0" RandomGroupSeed="309497472" RandomRuleSeed="1308869120" />
+        <Fight ID="-1" IDS="ZONE_4|Duel_INTERMISSION|1" CompletedCount="0" LossCount="0" EclipseCompletedCount="0" EclipseLossCount="0" StoryCount="0" CompletedTime="0" TimeLeft="0" RandomizeTimeLeft="1790715733" Level="0" RandomGroupSeed="1652493440" RandomRuleSeed="1546071680" />
+        <Fight ID="-1" IDS="ZONE_5|Duel|1" CompletedCount="0" LossCount="0" EclipseCompletedCount="0" EclipseLossCount="0" StoryCount="0" CompletedTime="0" TimeLeft="0" RandomizeTimeLeft="1790715733" Level="0" RandomGroupSeed="1430871680" RandomRuleSeed="352402016" />
+        <Fight ID="-1" IDS="ZONE_5|Duel_INTERMISSION|1" CompletedCount="0" LossCount="0" EclipseCompletedCount="0" EclipseLossCount="0" StoryCount="0" CompletedTime="0" TimeLeft="0" RandomizeTimeLeft="1790715733" Level="0" RandomGroupSeed="1525970816" RandomRuleSeed="569591424" />
+        <Fight ID="-1" IDS="ZONE_6|Duel|1" CompletedCount="0" LossCount="0" EclipseCompletedCount="0" EclipseLossCount="0" StoryCount="0" CompletedTime="0" TimeLeft="0" RandomizeTimeLeft="1790715733" Level="0" RandomGroupSeed="404762336" RandomRuleSeed="1543418624" />
+        <Fight ID="-1" IDS="ZONE_6|Duel_INTERMISSION|1" CompletedCount="0" LossCount="0" EclipseCompletedCount="0" EclipseLossCount="0" StoryCount="0" CompletedTime="0" TimeLeft="0" RandomizeTimeLeft="1790715733" Level="0" RandomGroupSeed="1412050816" RandomRuleSeed="1188789632" />
+        <Fight ID="-1" IDS="ZONE_7|Duel|1" CompletedCount="0" LossCount="0" EclipseCompletedCount="0" EclipseLossCount="0" StoryCount="0" CompletedTime="0" TimeLeft="0" RandomizeTimeLeft="1790715733" Level="0" RandomGroupSeed="1716169088" RandomRuleSeed="1003970304" />
+        <Fight ID="-1" IDS="ZONE_7|C3_Duel|1" CompletedCount="0" LossCount="0" EclipseCompletedCount="0" EclipseLossCount="0" StoryCount="0" CompletedTime="0" TimeLeft="0" RandomizeTimeLeft="1790715733" Level="0" RandomGroupSeed="170538048" RandomRuleSeed="901553984" />
+        <Fight ID="-1" IDS="Punchbag|Training|1" CompletedCount="0" LossCount="0" EclipseCompletedCount="0" EclipseLossCount="0" StoryCount="0" CompletedTime="0" TimeLeft="0" RandomizeTimeLeft="0" Level="0" />
+        <Fight ID="-1" IDS="Punchbag|Bosses|1" CompletedCount="2" LossCount="0" EclipseCompletedCount="0" EclipseLossCount="0" StoryCount="0" CompletedTime="0" TimeLeft="1790715762" RandomizeTimeLeft="0" Level="2" />
+        <Fight ID="-1" IDS="ZONE_1|BOSS_LYNX|1" CompletedCount="2" LossCount="0" EclipseCompletedCount="0" EclipseLossCount="0" StoryCount="0" CompletedTime="1790700000" TimeLeft="1790715850" RandomizeTimeLeft="0" Level="2" />
+      </Fights>
+      <SessionSettings>
+        <QualityCondition Value="HIGH" />
+        <AdvertRate Value="100" />
+        <AdvertRaidsRate Value="75" />
+        <AdvertBannersRaidsRate Value="0" />
+        <Disciple Value="0" />
+        <ShowDojoDisciple Value="0" />
+      </SessionSettings>
+      <FBData id="" />
+      <Shop>
+        <Lock Name="VERSIONAL_CONFIGS" />
+        <Lock Name="VERSIONAL_ASSETS" />
+        <Lock Name="ZONE_1" />
+        <Lock Name="ZONE_1_DONATE" />
+        <Lock Name="COMMON_RUBY_DONATE" />
+        <Lock Name="COMMON_RUBY_DONATE_CASKET" />
+        <Lock Name="ZONE_2" />
+        <Lock Name="ZONE_3" />
+        <Lock Name="ZONE_4" />
+        <Lock Name="ZONE_5" />
+        <Lock Name="ZONE_6" />
+        <Lock Name="ZONE_IM" />
+        <Lock Name="ZONE_7" />
+        <Lock Name="ZONE_7_2" />
+        <Lock Name="ZONE_7_3" />
+        <Lock Name="WEEKLY_OFFER_12" />
+        <Lock Name="WEEKLY_OFFER_13" />
+        <Lock Name="WEEKLY_OFFER_14" />
+        <Lock Name="WEEKLY_OFFER_15" />
+        <Lock Name="WEEKLY_OFFER_16" />
+        <Lock Name="WEEKLY_OFFER_17" />
+        <Lock Name="WEEKLY_OFFER_18" />
+        <Lock Name="WEEKLY_OFFER_19" />
+        <Lock Name="WEEKLY_OFFER_20_FUTURIST_MAGIC" />
+        <Lock Name="WEEKLY_OFFER_21" />
+        <Lock Name="AGNISSEAL_OFFER" />
+        <Lock Name="WEEKLY_OFFER_22_GLAIVE_GOD_EATER" />
+        <Lock Name="RAID_EVENT" />
+        <Lock Name="SUMMER_FEST_25" />
+        <Lock Name="SUMMER_FEST_26" />
+      </Shop>
+      <Perks>
+        <Perk Level="2" Name="PERK_DOUBLE_SWEEP" />
+      </Perks>
+      <PerkHistory>
+        <Level Value="2" Perk="PERK_DOUBLE_SWEEP" />
+      </PerkHistory>
+      <OpenTricks>
+      </OpenTricks>
+      <CounterItems>
+        <Items>
+          <Item Name="Casket_Gems" />
+          <Item Name="Bag_Gems" />
+          <Item Name="Chest_Gems" />
+          <Item Name="Pile_Coins" />
+          <Item Name="Bag_Coins" />
+          <Item Name="Chest_Coins" />
+          <Item Name="WEAPON_SAI" />
+          <Item Name="ARMOR_OLD_LEATHER" />
+          <Item Name="HELM_KENDO_MASK" />
+          <Item Name="HELM_CONICAL_HAT" />
+        </Items>
+      </CounterItems>
+    </Warrior>
+  </Warriors>
+  <Versions>
+    <Version Value="2.46.0" />
+    <DataVersion Value="2.46.0.0" />
+  </Versions>
+  <GameLaunchIndex Value="4" />
+</Root>

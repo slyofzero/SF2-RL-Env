@@ -1,0 +1,8 @@
+# Standalone APK Binaries (>100MB exceeds GitHub push limit)
+apks/*.apk
+!apks/.gitkeep
+
+# Emulator Screenshots & Temporary Dumps
+*.png
+*.jpg
+*.log

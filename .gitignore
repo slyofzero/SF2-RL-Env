@@ -1,0 +1,48 @@
+# Python Virtual Environment & Dependencies
+.venv/
+venv/
+env/
+ENV/
+*.pyvenv*
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# IDE & Editor Configurations
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# Logs & Temporary Files
+*.log
+*.tmp
+*.bak
+
+# Android Packages & Archives (>100MB exceeds GitHub limits)
+*.apk
+*.xapk
+*.aab
+*.apks
+
+# Modding Build Caches & Decompilation Artifacts
+build_cache/
+modding/build_cache/
+
+# Exception: keep directory placeholder files
+!.gitkeep

@@ -1,0 +1,12 @@
+# Modding Build Cache & Intermediate Decompilations
+build_cache/
+
+# Large Raw & Repacked Packages (>100MB)
+packages/*.xapk
+packages/*.apk
+!packages/.gitkeep
+
+# Tool Archives & Temporary Artifacts
+tools/*.zip
+*.tmp
+*.log

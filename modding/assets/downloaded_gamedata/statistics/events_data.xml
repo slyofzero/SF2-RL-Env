@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Data>
+  <EventID Value="6" />
+  <PayEventID Value="0" />
+  <RunCount Value="0" />
+  <SessionID Value="3" />
+  <FightAmount Value="0" />
+  <TimeLength Value="50" />
+  <EndBonus Value="9" />
+  <EndDate Value="1790694335" />
+  <EndLevel Value="1" />
+  <EndMoney Value="0" />
+  <EndXp Value="0" />
+  <EndEnergy Value="5" />
+  <Payments Value="0" />
+  <CheatId Value="0" />
+  <Info Value="" />
+  <Counter Value="0" />
+  <FilePosition Value="0" />
+  <PayLogPosition Value="0" />
+</Data>
