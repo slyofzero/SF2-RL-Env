@@ -19,6 +19,7 @@ Use this index to quickly locate which file to edit to achieve your desired chan
 | **Match Timer Freeze / Infinite Sparring** | ARM64 patch in `libil2cpp.so` (`BattleTimer`) | [03_IL2CPP_AND_BINARY_PATCHING.md](docs/03_IL2CPP_AND_BINARY_PATCHING.md) |
 | **Download Missing Chapters / Event Bundles** | Run `.agents/skills/game-content-downloader/scripts/download_packs.py` | [05_OFFLINE_BUNDLES_AND_CDN.md](docs/05_OFFLINE_BUNDLES_AND_CDN.md) |
 | **Startup Self-Extractor Files & Markers** | [`AssetExtractor.smali`](build_cache/baksmali_multidex/com/nekki/catblasters/AssetExtractor.smali) | [06_STARTUP_SMALI_HOOK.md](docs/06_STARTUP_SMALI_HOOK.md) |
+| **Match Round Count / Arbitrary Rounds** ($N$ rounds to win) | `ROUNDS_TO_WIN = N` or `--rounds <N>` in [`build_cat_blasters.py`](pipeline/build_cat_blasters.py#L31) | [03_IL2CPP_AND_BINARY_PATCHING.md](docs/03_IL2CPP_AND_BINARY_PATCHING.md#3e-arbitrary-round-control--match-victory-threshold-parameterization) |
 | **Rebuild & Sign Final Modded APK** | Run `python modding/pipeline/build_cat_blasters.py` | [07_BUILD_AND_SIGNING_PIPELINE.md](docs/07_BUILD_AND_SIGNING_PIPELINE.md) |
 
 ---

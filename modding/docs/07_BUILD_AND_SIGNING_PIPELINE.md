@@ -71,7 +71,7 @@ Loads Dojo serialized files from `assets/bin/Data/` with `UnityPy`, applies a 18
 ### Step 6b: Offline Assets, Save State & Binary Patches
 1. Copies all 30 bundle packages and configs from `modding/assets/downloaded_gamedata/` to `apktool_src/assets/gamedata/`.
 2. Copies the user's save profile from `modding/assets/userdata/` to `apktool_src/assets/userdata/`.
-3. Patches 12 file offsets in `lib/arm64-v8a/libil2cpp.so` (anti-cheat, XML hash checks, missing pack checks, Google Play warning, GDPR dialog).
+3. Patches file offsets in `lib/arm64-v8a/libil2cpp.so` (anti-cheat, XML hash checks, missing pack checks, Google Play warning, GDPR dialog, VIP infinite energy, and arbitrary round control).
 4. Replaces `intro.mp4` with a 0.04s (1-frame) black video to skip the 15-second opening cinematic.
 5. Assembles `classes.dex` using `smali.jar` from `modding/build_cache/baksmali_multidex/`.
 
@@ -90,7 +90,7 @@ java -jar uber-apk-signer.jar -a cat_blasters_unsigned.apk -o cat_signed --allow
 1. Performs 4-byte zip alignment (`zipalign`) for direct memory-mapped library loading.
 2. Injects Android Signature Scheme **v1** (JAR signature), **v2** (APK Signing Block), and **v3** (Key rotation block) using `modding/tools/debug.keystore`.
 3. Verifies signature blocks and copies final output to:
-   `bluestacks/apks/Shadow_Fight_2_MODDED_CYBERPUNK.apk`
+   `bluestacks/apks/SF2_Modded_v4.apk` (or custom `--output` target).
 
 ---
 
@@ -99,7 +99,12 @@ java -jar uber-apk-signer.jar -a cat_blasters_unsigned.apk -o cat_signed --allow
 To trigger the full pipeline from terminal:
 
 ```powershell
+# Standard build (5 rounds to win -> SF2_Modded_v4.apk):
 .venv\Scripts\python modding\pipeline\build_cat_blasters.py
+
+# Custom round target (e.g. single-round deathmatch or marathon bout):
+.venv\Scripts\python modding\pipeline\build_cat_blasters.py --rounds 1
+.venv\Scripts\python modding\pipeline\build_cat_blasters.py --rounds 8 --output SF2_Modded_v4_8_rounds.apk
 ```
 
 Typical execution time: **~30 to 45 seconds** (including reassembling dex, packaging 330+ MB of assets, and signing).

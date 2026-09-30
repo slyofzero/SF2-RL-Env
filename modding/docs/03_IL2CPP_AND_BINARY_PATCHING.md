@@ -66,6 +66,57 @@ On boot and before starting fights, `AAPGCAPGBLG` checks if any story or event a
 | `0x3437AFC` | `AGGMBMDDJIO.JFGBPBOCOIC` | `CheckGooglePlayLogin()` | `mov w0, #0; ret` | Disables the automatic Google Play Games login prompt. |
 | `0x32D9388` | `LJBDMDHNKFM.JFGBPBOCOIC` | `ShowGDPRDialog()` | `mov w0, #0; ret` | Permanently suppresses the European GDPR Privacy Policy / Terms modal on first boot. |
 
+### E. Arbitrary Round Control & Match Victory Threshold Parameterization
+Standard Shadow Fight 2 matches operate on a hardcoded "first to 2 round victories" rule (`best-of-3`), while Boss encounters default to 3 round victories (`best-of-5`). For reinforcement learning training loops or custom sparring benchmarks, we reverse-engineered the core combat lifecycle in `FightManager` (`FCJBEKHDLAF`) to allow configuring any arbitrary target number of rounds $N$ per match.
+
+```mermaid
+flowchart TD
+    A["Match Start: FCJBEKHDLAF.LPIEJMLPFBF"] -->|"w1 = N (0x33EA8E4)"| B["RoundModel.FHEDJOBDEPF(N)"]
+    B --> C["Start Round [x19, #0x17c] (Round Index)"]
+    C --> D["Active Combat Phase"]
+    D --> E["Character Death: FCJBEKHDLAF.BBCAMJDDOII"]
+    E -->|"Preserved b.hi (0x33EF960)"| F["Evaluate Round Winner & Increment [x1, #0x118]"]
+    F --> G["Round Transition: FCJBEKHDLAF.DHKCOFBMIEL"]
+    G --> H{"Victories (w21) >= Target (w22 = N)? (0x33E7D80)"}
+    H -->|"No (w21 < N)"| I["Branch to Next Round (0x33E803C)"]
+    I --> C
+    H -->|"Yes (w21 >= N)"| J["Branch to Match End (0x33E8164)"]
+    J --> K["Compute Stats: FCJBEKHDLAF.AIFOMGABBBA (w8 = N, 0x33E9444)"]
+    K --> L["Display Victory / Defeat Screen & Return to Map"]
+```
+
+#### Detailed Patch Table & Register Mappings
+
+| File Offset | Class & Method | Original Instruction | Patched Instruction | What It Accomplishes |
+| :--- | :--- | :--- | :--- | :--- |
+| `0x33E7D80` | `FCJBEKHDLAF.DHKCOFBMIEL` | `ldr w22, [x10, #0x1c]` | `mov w22, #N` | Overrides the victory comparator register `w22` during round transition checks. The game continuously loops through rounds until either combatant reaches $N$ victories (`w21 >= w22`), preventing premature match completion or unwanted extra rounds. |
+| `0x33E9444` | `FCJBEKHDLAF.AIFOMGABBBA` | `mov w8, #2` | `mov w8, #N` | Synchronizes the match statistics victory threshold with $N$ so post-match rating and reward calculations evaluate properly. |
+| `0x33EA8E4` | `FCJBEKHDLAF.LPIEJMLPFBF` | `ldr w1, [x8, #0x1c]` | `mov w1, #N` | Overrides the parameter passed to `RoundModel.FHEDJOBDEPF(w1)`, ensuring the rules engine and UI round indicators initialize with target $N$. |
+| `0x33EF960` | `FCJBEKHDLAF.BBCAMJDDOII` | `b.hi 0x33ef9a8` | `b.hi 0x33ef9a8` (preserved) | Ensures standard round evaluation so that matches continue across rounds 1, 2, ..., $N$ and only trigger the victory sequence when the target score is attained. |
+
+#### Internal Struct & Field Mapping
+* **`FCJBEKHDLAF` (`FightManager`)**: Universal match orchestrator instance.
+  * `[x19, #0x17c]` (`CLFDJLLDNGD`): Current round index integer (0-indexed).
+  * `[x1, #0x118]`: Current combatant round victory tally.
+* **`JIMKCICMMIL` (Fight Settings / Rules Model)**:
+  * `[x10, #0x1c]`: Original hardcoded round target (2 for tournament, 3 for boss). Replaced at runtime by `mov w22, #N`.
+* **`OJHODFIGFMA` (`RoundModel`)**:
+  * Initialized via `FHEDJOBDEPF(int32 target_rounds)` with `w1 = N`.
+
+#### Dynamic Instruction Generation
+In [`modding/pipeline/build_cat_blasters.py`](file:///c:/Users/Ishan/Personal/Porfolio/Shadow%20Fight%202/modding/pipeline/build_cat_blasters.py#L30-L37), arbitrary round counts are encoded dynamically using ARM64 32-bit `movz` encoding:
+$$\text{Opcode}(\text{rd}, N) = \text{0x52800000} \;\vert\; ((N \ \&\ \text{0xFFFF}) \ll 5) \;\vert\; (\text{rd} \ \&\ \text{0x1F})$$
+
+Developers can modify `ROUNDS_TO_WIN = N` in the script or pass `--rounds <N>` to compile APKs configured for single-round deathmatches ($N=1$), standard matches ($N=2$), or marathon bouts ($N=5$).
+
+#### Verification & Live Combat Confirmation
+* **Build Target**: `SF2_Modded_v4.apk` (`333.23 MB`).
+* **Encounter**: Act 1 Lynx encounter against bodyguard **Brick** on Insane difficulty (Rooftops stage).
+* **Live Test Results**: User verified live in BlueStacks:
+  * Match successfully ran across all rounds.
+  * When either the player or opponent won 5 rounds, the match ended cleanly.
+  * Verified full keyboard controls (`WASD`, `J`, `K`), virtual joystick responsiveness, and seamless round transitions.
+
 ---
 
 ## 4. "Changing What Changes What" (Modding Practical Guide)

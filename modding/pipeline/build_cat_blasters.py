@@ -23,14 +23,24 @@ APKTOOL_SRC = os.path.join(CACHE_DIR, "apktool_src")
 APKTOOL_JAR = os.path.join(ROOT_DIR, "modding", "tools", "apktool.jar")
 UBER_SIGNER = os.path.join(ROOT_DIR, "modding", "tools", "uber-apk-signer.jar")
 CAT_ICON_SRC = os.path.join(ROOT_DIR, "modding", "assets", "icons", "cat_blasters_icon_512.png")
-OUTPUT_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v3.apk")
+OUTPUT_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v4.apk")
 ORIGINAL_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_OG.apk")
 
-# Protection rule: SF2_Modded_v1.apk and SF2_Modded_v2.apk must NEVER be overwritten!
+# Configuration: Number of rounds to win per match (default: 5)
+# Can be changed here or passed via command line: --rounds <N>
+ROUNDS_TO_WIN = 5
+
+def arm64_movz(rd: int, imm16: int) -> bytes:
+    """Encodes ARM64 32-bit MOVZ instruction: mov w{rd}, #{imm16}."""
+    val = (0x52800000) | ((imm16 & 0xffff) << 5) | (rd & 0x1f)
+    return val.to_bytes(4, 'little')
+
+# Protection rule: SF2_Modded_v1.apk, SF2_Modded_v2.apk, and SF2_Modded_v3.apk must NEVER be overwritten!
 PROTECTED_V1_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v1.apk")
 PROTECTED_V2_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v2.apk")
-if os.path.abspath(OUTPUT_APK) in (os.path.abspath(PROTECTED_V1_APK), os.path.abspath(PROTECTED_V2_APK)):
-    raise ValueError("SF2_Modded_v1.apk and SF2_Modded_v2.apk are protected historical milestones and must NEVER be overwritten. Target v3 or higher!")
+PROTECTED_V3_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v3.apk")
+if os.path.abspath(OUTPUT_APK) in (os.path.abspath(PROTECTED_V1_APK), os.path.abspath(PROTECTED_V2_APK), os.path.abspath(PROTECTED_V3_APK)):
+    raise ValueError("SF2_Modded_v1.apk, v2.apk, and v3.apk are protected historical milestones and must NEVER be overwritten. Target v4 or higher!")
 
 # Mapping of Dojo Unity textures
 TARGET_ASSETS = {
@@ -78,6 +88,19 @@ def apply_texture_mod(raw_bytes: bytes, target_texture_name: str, shift_deg: flo
     return raw_bytes
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Build Cat Blasters standalone APK.")
+    parser.add_argument("--rounds", type=int, default=ROUNDS_TO_WIN, help=f"Target rounds to win (default: {ROUNDS_TO_WIN})")
+    parser.add_argument("--output", type=str, default=None, help="Custom output APK filename or path")
+    args, _ = parser.parse_known_args()
+    rounds = args.rounds
+    output_apk = OUTPUT_APK
+    if args.output:
+        output_apk = os.path.abspath(args.output) if os.path.isabs(args.output) else os.path.join(ROOT_DIR, "bluestacks", "apks", args.output)
+    if os.path.abspath(output_apk) in (os.path.abspath(PROTECTED_V1_APK), os.path.abspath(PROTECTED_V2_APK), os.path.abspath(PROTECTED_V3_APK)):
+        raise ValueError("SF2_Modded_v1.apk, v2.apk, and v3.apk are protected historical milestones and must NEVER be overwritten. Target v4 or higher!")
+    print(f"=== Configuring APK with ROUNDS_TO_WIN = {rounds} -> {os.path.basename(output_apk)} ===")
+
     print("=== Step 1: Decompiling original APK if needed ===")
     if not os.path.exists(APKTOOL_SRC):
         print(f"Decoding {ORIGINAL_APK} via apktool...")
@@ -208,13 +231,17 @@ def main():
         0x1cc5b44: ("Restore raid energy check (IEICNBBBNEJ.EHLKEFJNKPA)", bytes.fromhex("fe0f1ef8f44f01a9")),
         0x3414c4c: ("Restore CIHKNMDAPBG instruction", bytes.fromhex("f44f44a9")),
         0x296bd44: ("Restore Scene<object>.Update ret", bytes.fromhex("c0035fd6")),
-        0x3580ca4: ("Restore MapScene.PIMIMOACBNG instruction", bytes.fromhex("e10300aa")), # mov x21, x0
+        0x3580ca4: ("Restore MapScene.PIMIMOACBNG instruction", bytes.fromhex("f50300aa")), # mov x21, x21
         0x30c1258: ("Restore MACGEGDGBOI body", bytes.fromhex("fc6f05a9fa6706a9f85f07a9f65708a9f44f09a91d9d00b017820090938300b0948300b09c8300b0")),
         0x3063e1c: ("Unlimited energy getter bypass (ACHLOMELAJE.PDKBJDBJOOK)", bytes.fromhex("20008052c0035fd6")), # mov w0, #1; ret
         0x344aec8: ("Force VIP Unlimited Energy icon on MenuEnergyPanel UI", bytes.fromhex("34008052")), # mov w20, #1
         0x305aaa4: ("Force field 0x238 (IsUnlimitedEnergy) in ACHLOMELAJE.MEBIEMOMELE", bytes.fromhex("28008052")), # mov w8, #1
         0x3057bfc: ("Always allow energy spend (ACHLOMELAJE.AIIJFJLLIDB)", bytes.fromhex("20008052c0035fd6")), # mov w0, #1; ret
         0x3057964: ("Always return 5 energy (ACHLOMELAJE.FMNEFEMHCGG)", bytes.fromhex("a0008052c0035fd6")), # mov w0, #5; ret
+        0x33e7d80: (f"Set match round victory target to {rounds} (FCJBEKHDLAF.DHKCOFBMIEL)", arm64_movz(22, rounds)), # mov w22, #rounds
+        0x33e9444: (f"Set EndRound victory threshold to {rounds} (FCJBEKHDLAF.AIFOMGABBBA)", arm64_movz(8, rounds)), # mov w8, #rounds
+        0x33ea8e4: (f"Set RoundModel target rounds to {rounds} (FCJBEKHDLAF.LPIEJMLPFBF)", arm64_movz(1, rounds)), # mov w1, #rounds
+        0x33ef960: ("Standard round winner branch (FCJBEKHDLAF.BBCAMJDDOII)", bytes.fromhex("48020054")), # b.hi 0x33ef9a8
     }
     for lib_so in [
         os.path.join(APKTOOL_SRC, "lib", "arm64-v8a", "libil2cpp.so"),
@@ -244,6 +271,9 @@ def main():
         print("  Reassembled classes.dex with AssetExtractor startup hook.")
 
     print("\n=== Step 7: Rebuilding APK via Apktool ===")
+    apktool_build_dir = os.path.join(APKTOOL_SRC, "build")
+    if os.path.exists(apktool_build_dir):
+        shutil.rmtree(apktool_build_dir)
     rebuilt_apk = os.path.join(CACHE_DIR, "cat_blasters_unsigned.apk")
     cmd_build = f'java -jar "{APKTOOL_JAR}" b "{APKTOOL_SRC}" -o "{rebuilt_apk}" -f'
     subprocess.run(cmd_build, shell=True, check=True)
@@ -264,11 +294,11 @@ def main():
     # Copy final signed APK
     shutil.copy(
         os.path.join(signed_dir, "cat_blasters_unsigned-aligned-debugSigned.apk"),
-        OUTPUT_APK
+        output_apk
     )
     print(f"\n========================================================")
     print(f"SUCCESS! Cat Blasters 9k Standalone APK generated at:")
-    print(f"  -> {OUTPUT_APK} ({os.path.getsize(OUTPUT_APK)/(1024*1024):.2f} MB)")
+    print(f"  -> {output_apk} ({os.path.getsize(output_apk)/(1024*1024):.2f} MB)")
     print(f"========================================================")
 
 if __name__ == "__main__":

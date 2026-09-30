@@ -50,7 +50,7 @@ help:
 	@echo "Shadow Fight 2 Automation Makefile"
 	@echo "=================================="
 	@echo "Targets:"
-	@echo "  make install    - Check installation; install SF2_Modded_v3.apk if missing"
+	@echo "  make install    - Check installation; install SF2_Modded_v4.apk if missing"
 	@echo "  make boot       - Check installation; boot the game on BlueStacks"
 	@echo "  make all        - Run install check, then boot (default)"
 	@echo "  make reinstall  - Force reinstall the APK"

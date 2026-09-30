@@ -2,7 +2,7 @@
 """
 Install Script for Shadow Fight 2 (Cat Blasters 9k).
 Checks if the target package is already installed on the emulator/device.
-If not found, it installs the specified APK (default: SF2_Modded_v3.apk).
+If not found, it installs the specified APK (default: SF2_Modded_v4.apk).
 """
 
 import sys
