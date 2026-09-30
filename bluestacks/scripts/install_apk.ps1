@@ -9,7 +9,7 @@ so the game never prompts for external content downloads on launch.
 #>
 
 param(
-    [ValidateSet("original", "modded", "v1", "v2")]
+    [ValidateSet("original", "modded", "v1", "v2", "v3")]
     [string]$Target = "modded"
 )
 
@@ -27,10 +27,16 @@ if ($Target -eq "original") {
 } elseif ($Target -eq "v2") {
     $apkName = "SF2_Modded_v2.apk"
     $pkgName = "com.nekki.catblasters"
+} elseif ($Target -eq "v3") {
+    $apkName = "SF2_Modded_v3.apk"
+    $pkgName = "com.nekki.catblasters"
 } else {
-    # Default 'modded': Prefer v2 if it exists, otherwise use v1
+    # Default 'modded': Prefer v3 if it exists, then v2, otherwise use v1
+    $v3Path = Join-Path $PSScriptRoot "..\apks\SF2_Modded_v3.apk"
     $v2Path = Join-Path $PSScriptRoot "..\apks\SF2_Modded_v2.apk"
-    if (Test-Path $v2Path) {
+    if (Test-Path $v3Path) {
+        $apkName = "SF2_Modded_v3.apk"
+    } elseif (Test-Path $v2Path) {
         $apkName = "SF2_Modded_v2.apk"
     } else {
         $apkName = "SF2_Modded_v1.apk"

@@ -11,10 +11,12 @@ Located in [`bluestacks/apks/`](apks/):
 | APK File | Size | App Name | Package Identity | Contents & Features |
 | :--- | :--- | :--- | :--- | :--- |
 | **`SF2_OG.apk`** | 162.75 MB | **Shadow Fight 2** | `com.nekki.shadowfight` | Untampered base game with classic shadow icon and standard starting tutorial. |
-| **`SF2_Modded_v1.apk`** | **333.23 MB** | **Cat Blasters 9k** | `com.nekki.catblasters` | Custom Cyberpunk Cyan Dojo theme, neon cat launcher icon, **all 30 offline game bundles** (Acts 1-7, live events, offers), pre-loaded Level 52 equipment access save, all tutorials skipped, zero cutscene delay, and startup popups silenced. *(Protected v1 milestone build; future mods generate `SF2_Modded_v2.apk`).* |
+| **`SF2_Modded_v1.apk`** | 333.23 MB | **Cat Blasters 9k** | `com.nekki.catblasters` | Protected v1 milestone build. Custom Cyberpunk Cyan Dojo theme, neon cat icon, all 30 offline game bundles, tutorials skipped, cutscene and popups silenced. |
+| **`SF2_Modded_v2.apk`** | 333.23 MB | **Cat Blasters 9k** | `com.nekki.catblasters` | Protected v2 milestone build. Direct Act 1 Map boot hook replacing Dojo default. |
+| **`SF2_Modded_v3.apk`** | **333.20 MB** | **Cat Blasters 9k** | `com.nekki.catblasters` | **VIP Infinite Energy Build**: Boots straight to Act 1 Tournament Map (Scene 5) with permanent VIP Unlimited Energy indicator and zero fight energy consumption. |
 
 > [!NOTE]
-> Because both APKs have **unique package identities and Content Provider authorities**, they can be installed side-by-side on the **same BlueStacks instance** without conflicting.
+> Because all modded APKs have **unique package identities and Content Provider authorities**, they can be installed side-by-side on the **same BlueStacks instance** without conflicting with the original game.
 
 ---
 
@@ -22,14 +24,20 @@ Located in [`bluestacks/apks/`](apks/):
 
 ### Option A: Drag and Drop (Recommended)
 1. Open **BlueStacks 5**.
-2. Drag `bluestacks/apks/SF2_Modded_v1.apk` directly into the BlueStacks window.
+2. Drag `bluestacks/apks/SF2_Modded_v3.apk` directly into the BlueStacks window.
 3. BlueStacks will show "Installing app" on the home screen.
 4. Launch the game from the "Cat Blasters 9k" icon.
 
 ### Option B: PowerShell ADB Helper Script
 ```powershell
-# Install the modded cyberpunk standalone build
-.\bluestacks\scripts\install_apk.ps1 -Target modded
+# Install the latest modded build (v3: auto-starts fight on load)
+.\bluestacks\scripts\install_apk.ps1 -Target v3
+
+# Install the v2 build (boots straight to Map)
+.\bluestacks\scripts\install_apk.ps1 -Target v2
+
+# Install the milestone v1 build
+.\bluestacks\scripts\install_apk.ps1 -Target v1
 
 # Install the untampered original baseline build
 .\bluestacks\scripts\install_apk.ps1 -Target original
