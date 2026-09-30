@@ -45,6 +45,12 @@ PRESETS = {
     "kick": (1699, 935),
     "shadow": (1615, 803),
     "ranged": (1699, 684),
+
+    # Fight Menu
+    "pause": (960, 170),
+    "resume": (1380, 700),
+    "f-quit": (535, 700),
+    "f-exit": (1150, 775),
 }
 
 # Aliases for quick typing
