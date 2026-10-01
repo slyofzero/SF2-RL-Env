@@ -10,7 +10,7 @@ import time
 from typing import Optional, Tuple
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-APK_NAME = "SF2_Modded_v6.apk"
+APK_NAME = "SF2_Modded_v8.apk"
 DEFAULT_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", APK_NAME)
 DEFAULT_PACKAGE = "com.nekki.catblasters"
 

@@ -23,7 +23,7 @@ APKTOOL_SRC = os.path.join(CACHE_DIR, "apktool_src")
 APKTOOL_JAR = os.path.join(ROOT_DIR, "modding", "tools", "apktool.jar")
 UBER_SIGNER = os.path.join(ROOT_DIR, "modding", "tools", "uber-apk-signer.jar")
 CAT_ICON_SRC = os.path.join(ROOT_DIR, "modding", "assets", "icons", "cat_blasters_icon_512.png")
-OUTPUT_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v6.apk")
+OUTPUT_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v8.apk")
 ORIGINAL_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_OG.apk")
 
 # Configuration: Number of rounds to win per match (default: 5)
@@ -35,20 +35,24 @@ def arm64_movz(rd: int, imm16: int) -> bytes:
     val = (0x52800000) | ((imm16 & 0xffff) << 5) | (rd & 0x1f)
     return val.to_bytes(4, 'little')
 
-# Protection rule: SF2_Modded_v1.apk through v5.apk must NEVER be overwritten!
+# Protection rule: SF2_Modded_v1.apk through v7.apk must NEVER be overwritten!
 PROTECTED_V1_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v1.apk")
 PROTECTED_V2_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v2.apk")
 PROTECTED_V3_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v3.apk")
 PROTECTED_V4_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v4.apk")
 PROTECTED_V5_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v5.apk")
+PROTECTED_V6_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v6.apk")
+PROTECTED_V7_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v7.apk")
 if os.path.abspath(OUTPUT_APK) in (
     os.path.abspath(PROTECTED_V1_APK),
     os.path.abspath(PROTECTED_V2_APK),
     os.path.abspath(PROTECTED_V3_APK),
     os.path.abspath(PROTECTED_V4_APK),
     os.path.abspath(PROTECTED_V5_APK),
+    os.path.abspath(PROTECTED_V6_APK),
+    os.path.abspath(PROTECTED_V7_APK),
 ):
-    raise ValueError("SF2_Modded_v1 through v5 are protected milestones! Target v6 or higher!")
+    raise ValueError("SF2_Modded_v1 through v7 are protected milestones! Target v8 or higher!")
 
 # Mapping of Dojo Unity textures
 TARGET_ASSETS = {
@@ -281,6 +285,18 @@ def main():
         cmd_smali = f'java -jar "{smali_jar}" a "{baksmali_dir}" -o "{classes_dex_out}"'
         subprocess.run(cmd_smali, shell=True, check=True)
         print("  Reassembled classes.dex with AssetExtractor startup hook.")
+
+    # 2b. Ensure Frida Gadget and its config are embedded in lib/arm64-v8a
+    gadget_so = os.path.join(ROOT_DIR, "modding", "tools", "libfrida-gadget.so")
+    gadget_cfg = os.path.join(ROOT_DIR, "modding", "tools", "libfrida-gadget.config.so")
+    lib_arm64 = os.path.join(APKTOOL_SRC, "lib", "arm64-v8a")
+    os.makedirs(lib_arm64, exist_ok=True)
+    if os.path.exists(gadget_so):
+        shutil.copy2(gadget_so, os.path.join(lib_arm64, "libfrida-gadget.so"))
+        print("  Embedded libfrida-gadget.so into APK arm64-v8a.")
+    if os.path.exists(gadget_cfg):
+        shutil.copy2(gadget_cfg, os.path.join(lib_arm64, "libfrida-gadget.config.so"))
+        print("  Embedded libfrida-gadget.config.so into APK arm64-v8a.")
 
     print("\n=== Step 7: Rebuilding APK via Apktool ===")
     apktool_build_dir = os.path.join(APKTOOL_SRC, "build")
