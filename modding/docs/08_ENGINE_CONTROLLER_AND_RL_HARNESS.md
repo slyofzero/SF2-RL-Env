@@ -44,6 +44,13 @@ This must be run once per BlueStacks session. It is idempotent — safe to run a
 
 The `.venv` is managed by `uv` (Python 3.12). `frida` version must match the Gadget version embedded in the APK (v17.19.0).
 
+### 2.4 Modular File Structure
+The Frida JavaScript hooks are maintained in dedicated standalone `.js` files rather than embedded multiline strings:
+- `scripts/frida/engine_harness.js` — Action controller, timing state machines, and `FixedUpdate` physics hook.
+- `scripts/frida/telemetry_streamer.js` — 3D Vector3 coordinates, HP decryption, and `ScreenModel` hit badges.
+
+Python wrappers (`scripts/engine_controller.py`, `scripts/stream_telemetry.py`) load these `.js` files dynamically on connection, enabling full JavaScript syntax highlighting, IDE linting, and modular testing.
+
 ---
 
 ## 3. IL2CPP Reverse Engineering Findings
@@ -84,34 +91,37 @@ for (var i = 0; i < ranges.length; i++) {
 | Offset | Type | Content |
 |:---|:---|:---|
 | `+ 0xB0` | `pointer` | **Player 1** (`playerPtr`) — Shadow |
-| `+ 0xB8` | `pointer` | **Player 2** / opponent |
-| `+ 0x98` | `pointer` | Player 1 parameter object (health, stats) |
-| `+ 0xA0` | `pointer` | Player 2 parameter object |
+| `+ 0xB8` | `pointer` | **Player 2** (`opponentPtr`) / opponent |
+| `+ 0x10` | `pointer` | Player 1 parameter object (`PJKHAJKEHEL`) — also at `playerPtr + 0x148` |
+| `+ 0x18` | `pointer` | Player 2 parameter object (`PJKHAJKEHEL`) — also at `opponentPtr + 0x148` |
 | `+ 0x38` | `pointer` | Fighter list container |
 
 ### 3.4 playerPtr Memory Layout
 
 | Offset | Type | Content |
 |:---|:---|:---|
+| `+ 0x148` | `pointer` | Fighter parameter object (`PJKHAJKEHEL`) containing health and stats |
 | `+ 0x220` | `int32` | **Current joystick quadrant** slot. Write the active quadrant here every tick to hold direction. Write `-1` to release. |
+| `+ 0x250` | `pointer` | 3D Position component (call `0x342F0CC` to get native `Vector3` struct) |
 | `+ 0x258` | `pointer` | Action queue pointer (passed to `clearQueueFunc`) |
 
-### 3.5 Health Decryption (CodeStage ObscuredFloat)
+### 3.5 Health Resolution & Decryption (CodeStage ObscuredFloat)
 
-The game uses CodeStage Anti-Cheat `ObscuredFloat`. The encrypted value at `paramPtr + 0x15c` is decrypted as:
+The engine stores fighter health encrypted with CodeStage Anti-Cheat (`ObscuredFloat`) inside `PJKHAJKEHEL`:
+* **Max Health**: `ObscuredFloat` at offset `+ 0xF4` (`MGLLAKLAAOO`)
+* **Current Health**: `ObscuredFloat` at offset `+ 0x208` (`JNFNFEJAGGN`)
+*(Note: Offset `+ 0x15c` was previously inspected during early reversing, but is `MAAJLADCKDG`, a static character gear scaling constant—which is why it read a constant `0.5176` / `1.0`).*
+
+CodeStage anti-cheat scrambles bytes (swapping bytes 1 and 2 in `ACTkByte4`) and XORs them with a 4-byte key. The engine provides a dedicated native decryption function at RVA `0x1BC1F2C` (`ALBJPLAPOBO`):
 
 ```javascript
-function decryptObscuredFloat(ptr) {
-    var k = ptr.readS32();       // crypto key
-    var v = ptr.add(4).readS32(); // encrypted value
-    var buf = Memory.alloc(4);
-    buf.writeS32(k ^ v);          // XOR to recover raw IEEE 754 bits
-    return buf.readFloat();
-}
-```
+// Native ObscuredFloat decrypt (ALBJPLAPOBO - RVA 0x1BC1F2C)
+var decryptNative = new NativeFunction(il2cppBase.add(0x1BC1F2C), 'float', ['pointer']);
 
-Player 1 HP: `decryptObscuredFloat(battleCtrl.add(0x98).readPointer().add(0x15c))`  
-Player 2 HP: `decryptObscuredFloat(battleCtrl.add(0xA0).readPointer().add(0x15c))`
+var curHealth = decryptNative(pParam.add(0x208));
+var maxHealth = decryptNative(pParam.add(0xF4));
+var hpPercent = (maxHealth > 0) ? Math.min(1.0, Math.max(0.0, curHealth / maxHealth)) : 1.0;
+```
 
 ### 3.6 Ground Position (Spatial Facing)
 
@@ -411,18 +421,29 @@ SF2-Engine > status
 
 ---
 
-## 9. Telemetry Streamer (`test_engine_api.py`)
+## 9. Live JSON Telemetry Streamer (`stream_telemetry.py`)
 
-`scripts/test_engine_api.py` runs a parallel Frida session that streams live state at ~20Hz without dispatching any actions. It decrypts HP, reads ground positions, facing direction, distance, and hooks hit badge events.
+`scripts/stream_telemetry.py` connects to Frida Gadget, dynamically loads `scripts/frida/telemetry_streamer.js`, and streams real-time fight telemetry:
+* Decrypted HP for both fighters (from `0x208` / `0xF4`)
+* Exact 3D Vector3 ground coordinates (`x`, `y`, `z`), facing, and distance
+* Live animation states for Player and Opponent (`action`)
+* Detailed hit events: `head_hit`, `critical_hit`, `shock`, `blocked_hit`, `hit` (clean damage)
+* Round lifecycle events: `round_start` and `round_end` (with round number, winner, reason) — always recorded regardless of `--hits-only` filtering
 
 ```powershell
-.venv\Scripts\python.exe ./scripts/test_engine_api.py
-```
+# 1. Human-readable stream (defaults to calm 1 update per second)
+python ./scripts/stream_telemetry.py --pretty
 
-Output format:
-```
-[TICK]  P1_HP=0.847  P2_HP=0.931  P1_x=-2.41  P2_x=1.83  dist=4.24  facing=RIGHT
-[HIT]   CRITICAL HIT on Player 2
+# 2. Save live logs into game-logs/ in JSON Lines format (.jsonl)
+python ./scripts/stream_telemetry.py --pretty --log
+
+# 3. Custom log filename
+python ./scripts/stream_telemetry.py --log fight_run1.jsonl
+
+# 4. Custom update intervals or unthrottled live
+python ./scripts/stream_telemetry.py --interval 0.5   # every 0.5s
+python ./scripts/stream_telemetry.py --rate 5         # 5 updates/sec
+python ./scripts/stream_telemetry.py --live           # unthrottled ~20Hz real-time
 ```
 
 ---
@@ -463,3 +484,62 @@ With this controller in place, wrapping SF2 into a standard `gymnasium.Env` requ
 | Port 27042 connection fails on warm boot | Old v7 smali returned early, skipping `loadLibrary` | Use SF2_Modded_v8.apk which unconditionally loads Gadget |
 | Quadrant cleared same frame as attack → neutral move | Engine combo solver cancels directional modifier in 0ms | Hold quadrant for ≥12 ticks after attack fires (Phase 2) |
 | `actUp` / `actDown` on wrong pointer → crash | playerPtr can be null during scene transitions | All calls gated by `if (!playerPtr || playerPtr.isNull()) return` |
+
+---
+
+## 13. Engine Action State Machine & Master Action Catalog
+
+### 13.1 Input Intents vs. Engine Actions
+In Shadow Fight 2, there is an important distinction between **Input Intents** and **Engine Actions**:
+
+1. **Input Intents (`engine_controller.py`)**:
+   - The virtual joystick directions (`UP`, `FORWARD`, `BACK`, `DOWN`, diagonals) and action buttons (`PUNCH`, `KICK`).
+   - Dispatched into `actDown` / `actUp` to simulate physical or virtual controller events.
+
+2. **Engine Actions (`telemetry_streamer.js` / `PlayMove` RVA `0x34EC600`)**:
+   - The actual animation and physical state machine clips executed by the engine.
+   - Handled via `OLKKAIFGGAK.OJHIDJPICJN` (Character Action Dispatcher), which routes triggers across 16 internal event categories:
+     - `EVENT_KEY_PRESSED` (Input attacks, acrobatics, and locomotion)
+     - `EVENT_ANIM_START` (Automatic guard and blocking animations)
+     - `EVENT_HIT` (Damage taken animations, staggers, and flinches)
+     - `EVENT_ANIM_INTERRUPTED` (Knockdowns, wall hits, ground hits, and recoveries)
+     - `EVENT_ROUND_STAGE` (Starting stances, victory poses, and timeout falls)
+
+### 13.2 Master Catalog of 147 Engine Actions
+
+#### 1. Input Strikes & Combat Attacks (`EVENT_KEY_PRESSED`)
+These actions are initiated by either the player or opponent choosing an attack intent:
+- **Barehanded / Fist Attacks**: `HighPunch`, `DoublePunch`, `HeavyPunch`, `LowPunch`, `SpinningPunch`, `UpperCut`, `ElbowStrike`, `ShortUpwardElbowStrike`.
+- **Kicks**: `FrontKick`, `LowKick`, `BackKick`, `HighKick`, `AxeKick`, `Sweep`, `DoubleSweep`, `FrontJumpKick`, `ShortJumpKick`, `TwoFootJumpKick`, `ReverseJumpKick`, `DoubleJumpKick`, `BackFlipKick`, `DodgeKick`, `DodgeReverseKick`, `HighKneeUp`, `SuckerKick`.
+- **Weapon Attacks (Equipped: Knives)**: `KnivesSlash`, `KnivesDoubleSlash`, `KnivesSuperSlash`, `KnivesHeavySlash`, `KnivesUpperSlash`, `KnivesLowSlash`, `KnivesSpinningSlash`.
+- **Close-Range Throws**: `ThrowForward`, `ThrowThroughTheBack`, `ThrowSuplexVProfile`.
+
+#### 2. Locomotion & Acrobatics (`EVENT_KEY_PRESSED` / `EVENT_WALL_HIT`)
+- **Movement**: `StepForward`, `StepBack`, `DoubleStepForward`, `Duck`.
+- **Rolls & Flips**: `ForwardRoll`, `BackRoll`, `FrontFlip`, `BackFlip`, `BackHandflip`.
+- **Wall Bounces & Aerials**: `JumpUp`, `WallJump_50`, `WallJump_100`, `WallJump_200`, `WallJump_250`, `WallJump_50_PVP`, `WallJump_100_PVP`, `WallJump_200_PVP`, `WallJump_250_PVP`.
+
+#### 3. Defensive Blocks & Guards (`EVENT_ANIM_START`)
+Triggered automatically when a fighter is neutral or moving away while an opponent's attack enters active collision frames:
+- **Standing & Mid Guards**: `HighBlock`, `HighBlockPlus`, `HighBlockHeavy`, `MiddleBlock`, `MiddleBlockPlus`, `MiddleBlockHeavy`.
+- **Low & Overhead Guards**: `SweepBlock`, `SweepBlockHeavy`, `OverheadBlock`, `OverheadBlockHeavy`, `TitanBlock`.
+
+#### 4. Hit Reactions & Stagger States (`EVENT_HIT` / `EVENT_ANIM_START`)
+Triggered when an incoming attack connects unblocked:
+- **Head & High Hits**: `HighHit`, `HighHitShort`, `HighHitShortPlus`, `HighHitLong`, `HighHitHeavy`, `HighHitPlus`, `HighHitFall`.
+- **Body & Mid Hits**: `MiddleHit`, `MiddleHitShort`, `MiddleHitShortPlus`, `MiddleHitHeavy`, `MiddleHitPlus`, `MiddleHitFall`, `SpinningHit`, `SpinningHitHeavy`, `SpinningHitFall`.
+- **Low & Sweep Hits**: `LowHit`, `LowHitHeavy`, `LowPullHitHeavy`, `SweepHit`, `SweepHitHeavy`, `SweepHitFall`.
+- **Stun & Special Statuses**: `Stun`, `StunTransitionFromIdle`, `MindThrowHit`, `TitansHarpoonHit`, `TitansHarpoonStrikeFall`, `TitansHarpoonHitGrab`.
+
+#### 5. Knockdowns, Ground States & Recoveries (`EVENT_ANIM_INTERRUPTED`)
+Triggered when a hit carries knockdown momentum or sends the fighter against arena boundaries:
+- **Falls & Ground Impact**: `PhysicalFall`, `PhysicalFallSuperHit`, `PhysicalGroundHit`, `PhysicalLying`.
+- **Wall Collisions**: `WallHit`, `WallHitFall`.
+- **Standup Recoveries**: `Standup`, `StandupBack`, `StandupAfterThrowFall`.
+- **Special Boss / Item Hits**: `DirectorIcePinsPlayerHit`, `IcePinsPlayerHit`, `InvisibilityCloakPlayerHit`.
+
+#### 6. Stances, Intros & Match Outcomes (`EVENT_ROUND_STAGE` / `NONE`)
+- **Neutral & Stance Clips**: `StanceIdle`, `SetDirectionStanceIdle`, `FistsStartStanceIdle-Left`, `FistsStartStanceIdle-Right`, `KnivesStartStanceIdle`.
+- **Round Intros**: `FistsStartStance-Left`, `FistsStartStance-Right`, `KnivesStartStance-Left`, `KnivesStartStance-Right`.
+- **Match Endings**: `Win_Knives`, `Win_Fists`, `Loss_1`, `Loss_2`, `Loss_fall`, `TimeoutLoss`, `LossThrowForward`, `LossThrowBack`.
+
