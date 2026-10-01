@@ -37,12 +37,35 @@ if (!il2cppBase) {
         }
     }
 
+    // Helper: Decrypt CodeStage ObscuredInt
+    function decryptObscuredInt(ptr) {
+        try {
+            if (!ptr || ptr.isNull()) return 0;
+            var k = ptr.readS32();
+            var v = ptr.add(4).readS32();
+            return (k ^ v);
+        } catch(e) {
+            return 0;
+        }
+    }
+
     // Helper: Read IL2CPP UTF-16 String
     function readIl2cppString(ptr) {
         try {
             if (!ptr || ptr.isNull()) return null;
             var len = ptr.add(0x10).readS32();
             return ptr.add(0x14).readUtf16String(len);
+        } catch(e) {
+            return null;
+        }
+    }
+
+    // Helper: Read Item Name from HOOAAGABMBL
+    function readItemName(itemPtr) {
+        if (!itemPtr || itemPtr.isNull()) return null;
+        try {
+            var strPtr = itemPtr.add(0x18).readPointer();
+            return readIl2cppString(strPtr);
         } catch(e) {
             return null;
         }
@@ -55,6 +78,11 @@ if (!il2cppBase) {
     var masterTickAddr = il2cppBase.add(0x33F2A54);
     var playerPtr = null;
     var opponentPtr = null;
+
+    var p1Name = "Shadow";
+    var p2Name = "Opponent";
+    var p1Weapon = "Fists";
+    var p2Weapon = "Fists";
 
     var p1CurrentMove = "StanceIdle";
     var p2CurrentMove = "StanceIdle";
@@ -174,6 +202,7 @@ if (!il2cppBase) {
     // 3. Hook Round Lifecycle Events
     var currentRound = 1;
     var lastBattleCtrl = null;
+    var equipmentInfoSent = false;
 
     // Round Start: ViewerFight.Play (RVA 0x35BE050)
     Interceptor.attach(il2cppBase.add(0x35BE050), {
@@ -215,29 +244,91 @@ if (!il2cppBase) {
 
     // Native ObscuredFloat decrypt function (ALBJPLAPOBO - RVA 0x1BC1F2C)
     var decryptNative = new NativeFunction(il2cppBase.add(0x1BC1F2C), 'float', ['pointer']);
+    var getTimeScale = new NativeFunction(il2cppBase.add(0x3BFB998), 'float', []);
+    var isGamePaused = false;
+
+    // Hook Pause Dialog Lifecycle: Open (0x2FFE62C, 0x3037428) & Close (0x2FFDFC4)
+    Interceptor.attach(il2cppBase.add(0x2FFE62C), {
+        onEnter: function(args) { isGamePaused = true; }
+    });
+    Interceptor.attach(il2cppBase.add(0x3037428), {
+        onEnter: function(args) { isGamePaused = true; }
+    });
+    Interceptor.attach(il2cppBase.add(0x2FFDFC4), {
+        onEnter: function(args) { isGamePaused = false; }
+    });
+
+    function cleanFighterName(n) {
+        return (n || "").replace(/^NAME_/, "");
+    }
 
     // 4. Master Physics Interceptor
     Interceptor.attach(masterTickAddr, {
         onEnter: function(args) {
             try {
+                // If game is paused or timeScale is 0, suppress all frame logs
+                if (isGamePaused || getTimeScale() === 0.0) {
+                    return;
+                }
+
                 var battleCtrl = args[0];
                 if (battleCtrl.isNull()) return;
 
                 if (!lastBattleCtrl || !lastBattleCtrl.equals(battleCtrl)) {
                     lastBattleCtrl = battleCtrl;
                     currentRound = 1;
+                    equipmentInfoSent = false;
+                    isGamePaused = false;
                 }
 
                 playerPtr = battleCtrl.add(0xB0).readPointer();
                 opponentPtr = battleCtrl.add(0xB8).readPointer();
                 if (playerPtr.isNull() || opponentPtr.isNull()) return;
 
-                // Read and Decrypt Real Health from fighter+0x148 (PJKHAJKEHEL)
-                // Max health is at +0xF4, Current health is at +0x208
+                // Read and Decrypt Real Health and Equipment from fighter+0x148 (PJKHAJKEHEL)
                 var p1Param = playerPtr.add(0x148).readPointer();
                 if (p1Param.isNull()) p1Param = battleCtrl.add(0x10).readPointer();
                 var p2Param = opponentPtr.add(0x148).readPointer();
                 if (p2Param.isNull()) p2Param = battleCtrl.add(0x18).readPointer();
+
+                // Emit singular EQUIPMENT_INFO at start before frames
+                if (!equipmentInfoSent && !p1Param.isNull() && !p2Param.isNull()) {
+                    var p1N = readIl2cppString(p1Param.add(0x188).readPointer()) || "Shadow";
+                    var p1W = readItemName(p1Param.add(0xC0).readPointer()) || "Fists";
+                    var p1A = readItemName(p1Param.add(0xC8).readPointer()) || "None";
+                    var p1H = readItemName(p1Param.add(0xD0).readPointer()) || "None";
+                    var p1R = readItemName(p1Param.add(0xD8).readPointer()) || "NoRanged";
+                    var p1M = readItemName(p1Param.add(0xE0).readPointer()) || "NoMagic";
+
+                    var p2N = readIl2cppString(p2Param.add(0x188).readPointer()) || "Opponent";
+                    var p2W = readItemName(p2Param.add(0xC0).readPointer()) || "Fists";
+                    var p2A = readItemName(p2Param.add(0xC8).readPointer()) || "None";
+                    var p2H = readItemName(p2Param.add(0xD0).readPointer()) || "None";
+                    var p2R = readItemName(p2Param.add(0xD8).readPointer()) || "NoRanged";
+                    var p2M = readItemName(p2Param.add(0xE0).readPointer()) || "NoMagic";
+
+                    send({
+                        type: "EQUIPMENT_INFO",
+                        timestamp: Date.now() / 1000.0,
+                        player: {
+                            name: cleanFighterName(p1N),
+                            weapon: p1W,
+                            armor: p1A,
+                            helm: p1H,
+                            ranged: p1R,
+                            magic: p1M
+                        },
+                        opponent: {
+                            name: cleanFighterName(p2N),
+                            weapon: p2W,
+                            armor: p2A,
+                            helm: p2H,
+                            ranged: p2R,
+                            magic: p2M
+                        }
+                    });
+                    equipmentInfoSent = true;
+                }
 
                 var p1_hp = 1.0, p2_hp = 1.0;
                 if (!p1Param.isNull()) {
@@ -320,16 +411,36 @@ if (!il2cppBase) {
 
                 tickIndex++;
 
-                // Stream every 3 physics ticks (~20 Hz at 60 FPS) or immediately when hits occur
-                var hasHits = pendingHits.length > 0;
-                if (tickIndex % 3 === 0 || hasHits) {
-                    var hitsBatch = pendingHits.slice(0);
-                    pendingHits = [];
+                // Read remaining match round timer from ViewerFight (preFight+0x80)
+                var timeLeft = 99.0;
+                try {
+                    var preFight = battleCtrl.add(0x198).readPointer();
+                    if (!preFight.isNull()) {
+                        var vf = preFight.add(0x80).readPointer();
+                        if (!vf.isNull()) {
+                            var framesLeft = decryptObscuredInt(vf.add(0x90));
+                            if (framesLeft > 0) {
+                                timeLeft = parseFloat((framesLeft / 60.0).toFixed(2));
+                            } else {
+                                var sec = decryptObscuredInt(vf.add(0xA0));
+                                if (sec > 0) {
+                                    timeLeft = parseFloat(sec.toFixed(2));
+                                }
+                            }
+                        }
+                    }
+                } catch(e) {}
 
-                    send({
+                // Stream every single physics tick (60 Hz) or immediately on hit events
+                var hasHits = pendingHits.length > 0;
+                var hitsBatch = pendingHits.slice(0);
+                pendingHits = [];
+
+                send({
                         type: "TELEMETRY_FRAME",
                         tick: tickIndex,
                         timestamp: Date.now() / 1000.0,
+                        time_left: timeLeft,
                         player: {
                             hp: parseFloat(Math.min(1.0, Math.max(0.0, p1_hp)).toFixed(4)),
                             x: p1_x,
@@ -349,7 +460,6 @@ if (!il2cppBase) {
                         distance: distance,
                         hits: hitsBatch
                     });
-                }
             } catch(e) {}
         }
     });

@@ -51,7 +51,7 @@ def main():
     parser = argparse.ArgumentParser(description="Live JSON Telemetry Streamer for Shadow Fight 2.")
     parser.add_argument("--interval", type=float, default=1.0, help="Stream interval in seconds (default: 1.0s). Use 0 for unthrottled live.")
     parser.add_argument("--rate", type=float, default=None, help="Updates per second (Hz). E.g. --rate 1 or --rate 5.")
-    parser.add_argument("--live", action="store_true", help="Shortcut for unthrottled ~20Hz real-time stream (same as --interval 0)")
+    parser.add_argument("--live", action="store_true", help="Shortcut for unthrottled 60Hz tick-wise stream (every single physics tick)")
     parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON objects instead of single-line NDJSON")
     parser.add_argument("--hits-only", action="store_true", help="Only stream frames when a hit event occurs")
     parser.add_argument("--log", "--save-log", dest="save_log", nargs="?", const="auto", default=None, help="Store live telemetry in a JSONL file under game-logs/ (auto timestamped if filename omitted)")
@@ -137,7 +137,15 @@ def main():
         if message["type"] == "send":
             payload = message.get("payload", {})
             msg_type = payload.get("type")
-            if msg_type == "ROUND_START":
+            if msg_type == "EQUIPMENT_INFO":
+                event_data = {
+                    "event": "equipment_info",
+                    "player": payload.get("player", {}),
+                    "opponent": payload.get("opponent", {}),
+                    "timestamp": payload.get("timestamp", time.time())
+                }
+                log_event(event_data)
+            elif msg_type == "ROUND_START":
                 event_data = {
                     "event": "round_start",
                     "round": payload.get("round", 1),
@@ -174,7 +182,7 @@ def main():
     script.on("message", on_message)
     script.load()
 
-    mode_desc = "unthrottled ~20Hz live" if effective_interval == 0.0 else f"every {effective_interval}s"
+    mode_desc = "unthrottled 60Hz tick-wise stream" if effective_interval == 0.0 else f"every {effective_interval}s"
     print(f"[SUCCESS] Telemetry streaming ({mode_desc}). Press Ctrl+C to stop.\n", file=sys.stderr)
 
     try:
@@ -183,14 +191,18 @@ def main():
                 time.sleep(1.0)
         else:
             waiting_shown = False
+            last_printed_tick = -1
             while True:
                 time.sleep(effective_interval)
                 with lock:
                     if latest_frame is not None:
-                        hits_snapshot = list(accumulated_hits)
-                        accumulated_hits.clear()
-                        print_frame(latest_frame, hits_snapshot)
-                        waiting_shown = False
+                        cur_tick = latest_frame.get("tick", -1)
+                        if cur_tick != last_printed_tick:
+                            hits_snapshot = list(accumulated_hits)
+                            accumulated_hits.clear()
+                            print_frame(latest_frame, hits_snapshot)
+                            last_printed_tick = cur_tick
+                            waiting_shown = False
                     elif not waiting_shown:
                         print("[INFO] Connected to engine. Waiting for combat scene to tick...", file=sys.stderr)
                         waiting_shown = True

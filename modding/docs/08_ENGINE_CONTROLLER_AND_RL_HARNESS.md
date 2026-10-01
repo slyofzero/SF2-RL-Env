@@ -543,3 +543,147 @@ Triggered when a hit carries knockdown momentum or sends the fighter against are
 - **Round Intros**: `FistsStartStance-Left`, `FistsStartStance-Right`, `KnivesStartStance-Left`, `KnivesStartStance-Right`.
 - **Match Endings**: `Win_Knives`, `Win_Fists`, `Loss_1`, `Loss_2`, `Loss_fall`, `TimeoutLoss`, `LossThrowForward`, `LossThrowBack`.
 
+### 13.3 Weapon Scoping & Live Equipment Resolution
+While kicks, acrobatics, blocks, throws, and hit reactions are universal across all characters, **punch and slash actions are strictly scoped by the equipped weapon**:
+
+1. **Weapon Scoping Mechanics**:
+   - A barehanded fighter (e.g. `Monkey` with `Fists`, or Shadow after a `Shock` disarm) only has fist strikes active (`HighPunch`, `DoublePunch`, `HeavyPunch`, `LowPunch`, `SpinningPunch`, `UpperCut`, `ElbowStrike`).
+   - A fighter with Knives (`WEAPON_KNIVES`) replaces barehanded punch combos with dedicated knife slashes (`KnivesSlash`, `KnivesDoubleSlash`, `KnivesSuperSlash`, `KnivesHeavySlash`, `KnivesUpperSlash`, `KnivesLowSlash`, `KnivesSpinningSlash`).
+   - Equipping Swords or Staff activates their respective weapon action trees (`swords_super_slash`, `staff_heavy_slash`).
+
+2. **Native Memory Resolution**:
+   - Fighter Param block: `fighter + 0x148` (`PJKHAJKEHEL`).
+   - Equipped Items:
+     - `+0xB8`: Skeleton (`Skeleton`)
+     - `+0xC0`: Weapon (`HOOAAGABMBL`, string at `+0x18`) -> e.g. `"WEAPON_KNIVES"`, `"Fists"`
+     - `+0xC8`: Armor / Body (`HOOAAGABMBL`) -> e.g. `"Body"`, `"BODY_MONKEY"`
+     - `+0xD0`: Helm / Head (`HOOAAGABMBL`) -> e.g. `"Head"`, `"HEAD_MONKEY"`
+     - `+0xD8`: Ranged Weapon (`HOOAAGABMBL`) -> e.g. `"NoRanged"`
+     - `+0xE0`: Magic (`HOOAAGABMBL`) -> e.g. `"NoMagic"`
+     - `+0x188`: Fighter Name (`string`) -> e.g. `"NAME_SHADOW"`, `"NAME_MONKEY"`
+   - A singular `EQUIPMENT_INFO` event is dispatched once at the start of combat containing both fighters' complete gear profile (weapon, armor, helm, ranged, magic, and name).
+   - Subsequent `ROUND_START` and periodic `TELEMETRY_FRAME` packets are kept completely clean of equipment clutter, focusing solely on kinematics, actions, health, and hit events.
+
+### 13.4 Real-Time Round Countdown Clock (`time_left`)
+The 99-second match countdown timer rendered at the top-center HUD is managed by `ViewerFight` (referenced at `battleCtrl + 0x198` (`PreFight`) $\rightarrow$ `+ 0x80` (`ViewerFight`)):
+- `viewerFight + 0x90`: `ObscuredInt GJOBKIBMLHC` — **Total remaining frames** (starts at $99 \times 60 = 5940$, decrements by 1 on every single physics tick).
+- `viewerFight + 0xA0`: `ObscuredInt MOBINBAJICJ` — **Total remaining seconds** (starts at 99, decrements every 60 ticks).
+- `viewerFight + 0xB0`: `int KBFHMLONBPA` — Raw integer seconds rendered to `roundTimer` HUD (`LabelAlias` at `+ 0x38`).
+
+By decrypting `viewerFight + 0x90` on every physics tick, `telemetry_streamer.js` provides high-precision sub-second time remaining (`time_left = framesLeft / 60.0`), allowing RL agents and observers to track the clock smoothly ticking away from `99.00` down to `0.00`.
+
+
+---
+
+## 14. Simulation Speed Multipliers (`timeScale`) & Pre-Round Timing Characteristics
+
+### 14.1 How `Time.timeScale` Operates
+Through Frida RPC, [`scripts/engine_controller.py`](file:///c:/Users/Ishan/Personal/Porfolio/Shadow%20Fight%202/scripts/engine_controller.py) invokes `UnityEngine.Time.set_timeScale` (`0x3BFB9C0`) to accelerate simulation. In Unity, `timeScale` controls how many physics ticks (`FixedUpdate`) execute per real-world second:
+$$\text{Ticks To Run Per Real Second} = \frac{\Delta t_{\text{real}} \times \text{timeScale}}{\text{fixedDeltaTime (0.01667s)}}$$
+
+- **1x**: ~60 physics ticks per real-world second.
+- **10x**: ~600 physics ticks per real-world second.
+- **100x**: ~6,000 physics ticks per real-world second (CPU bound).
+
+### 14.2 Pre-Round Intro Tick Discrepancy (444 vs 550 vs 4001 Ticks)
+When inspecting the telemetry logs across different speeds, the first round's `round_start` event fires at noticeably different tick indices:
+- **1x speed**: `round_start` occurs at $\approx$ **tick 444**
+- **10x speed**: `round_start` occurs at $\approx$ **tick 550**
+- **100x speed**: `round_start` occurs at $\approx$ **tick 4001**
+
+#### Root Cause: Decoupling of Scaled Physics and Unscaled Wall-Clock Operations
+Before `ViewerFight.Play` (`0x35BE050`) dispatches the `round_start` event, the game runs a sequence with components that **do not scale with `timeScale`**:
+1. **Asynchronous Resource Deserialization**: Loading 3D meshes, skins, weapons, and particle effects from memory/storage. These background disk and memory I/O operations execute at physical hardware speed.
+2. **Audio Track Synchronization**: The announcer voiceover (*"ROUND 1... FIGHT!"*) streams through Android's hardware audio buffer (OpenSL/AudioTrack). The audio track plays at normal 1.0x pitch and duration (~1.5–2.0 real seconds).
+3. **Unscaled UI Transitions**: Camera pans and UI banner animations utilize `Time.unscaledDeltaTime` so visual transitions do not break when `timeScale` is adjusted.
+
+#### Mathematical Explanation
+While the engine waits for that real-world wall-clock delay ($\approx 0.8 - 2.0\text{ seconds}$), `FixedUpdate` is **already running and incrementing `tickIndex`**:
+
+| Speed | Real-World Intro Delay | Physics Ticks Churned During Delay | Total Ticks at `round_start` |
+|:---|:---|:---|:---|
+| **1x** | $\approx 2.0\text{ real seconds}$ | $\approx 2.0 \times 60 = \mathbf{120\text{ ticks}}$ (+ stance anims) | **$\approx 444\text{ ticks}$** |
+| **10x** | $\approx 1.5\text{ real seconds}$ (some UI skips) | $\approx 1.5 \times 350 = \mathbf{525\text{ ticks}}$ | **$\approx 550\text{ ticks}$** |
+| **100x** | $\approx 0.8\text{ real seconds}$ (CPU saturated) | $\approx 0.8 \times 4,500 = \mathbf{3,600+\text{ ticks}}$ | **$\approx 4,001\text{ ticks}$** |
+
+### 14.3 Implications for RL Harness Design
+- **Never hardcode tick thresholds for match onset**: Do not assume combat begins at `tick == 444`. Always gate the RL episode step loop on the discrete `round_start` event.
+- **Strict Invariance During Active Combat**: Once `round_start` has fired, all combat physics, fighter velocities, collision boxes, and damage calculations are **100% deterministic per physics tick**, irrespective of whether the game runs at 1x, 5x, or 10x simulation speed.
+
+---
+
+## 15. Native Game Actions API (`pause`, `resume`, `exit_fight`)
+
+To enable a completely headless RL environment without relying on OS/emulator touch coordinates (`adb shell input tap`), game flow controls are implemented natively through IL2CPP method calls.
+
+### 15.1 Reverse Engineered Method Targets
+1. **Pause & Resume Button Handler**:
+   - Class: `FCJBEKHDLAF` (`battleCtrl`)
+   - Method: `OANGGKCBAOJ(battleCtrl, actionId)` (RVA `0x33F3AD8`)
+   - Enum `ViewerFight.GHOHIFCGFBO`:
+     - `ButtonPause = 0`: Pauses the fight and instantiates the `PauseScreen` UI.
+     - `ButtonPauseSurrender = 1`: Triggers pause-menu surrender.
+     - `ButtonPausePlay = 2`: Closes `PauseScreen` and resumes the fight.
+2. **Immediate Match Exit / Surrender**:
+   - Class: `FCJBEKHDLAF` (`battleCtrl`)
+   - Method: `LPIEJMLPFBF(battleCtrl, gameOverType)` (RVA `0x33EE838`)
+   - Enum `JPGAILBOMOF`:
+     - `GAME_OVER_SURRENDER = -1`: Immediately terminates combat as a surrender and transitions the game scene back to `MapScene`.
+3. **Pause State & Modal Tracking**:
+   - Class: `PreFight` (located at `FightScene + 0x98`)
+   - Field `+0x90`: `PauseScreen IHNMJKLMFMA`. When non-null, the pause modal is active; when null, the modal is closed and combat is unpaused.
+
+### 15.2 Thread-Safe Execution via `Scene<object>.Update`
+In Unity IL2CPP, invoking UI methods directly from asynchronous Frida RPC worker threads causes access violations. Furthermore, `FixedUpdate` stops ticking while paused.
+
+To resolve this, [`scripts/frida/game_actions.js`](file:///c:/Users/Ishan/Personal/Porfolio/Shadow%20Fight%202/scripts/frida/game_actions.js) hooks `Scene<object>.Update` (RVA `0x296FD44`), which runs continuously at 60 Hz across all game scenes on Unity's main UI thread:
+```javascript
+// Scheduled execution inside main-thread Update()
+if (pendingAction !== null) {
+    if (pendingAction === 'pause') {
+        onButtonAction(battleCtrl, 0); // ButtonPause
+    } else if (pendingAction === 'resume') {
+        onButtonAction(battleCtrl, 2); // ButtonPausePlay
+    } else if (pendingAction === 'exit') {
+        surrenderAction(battleCtrl, -1); // GAME_OVER_SURRENDER
+    }
+    pendingAction = null;
+}
+```
+
+### 15.3 CLI & Python RL Harness Usage
+Both standalone CLI execution and importable Python bindings are provided in [`scripts/game_actions.py`](file:///c:/Users/Ishan/Personal/Porfolio/Shadow%20Fight%202/scripts/game_actions.py):
+
+```bash
+# Query active scene and pause status
+python scripts/game_actions.py status
+
+# Native unpause / resume
+python scripts/game_actions.py resume
+
+# Native pause
+python scripts/game_actions.py pause
+
+# Native immediate match exit / surrender
+python scripts/game_actions.py exit
+```
+
+In Python RL code:
+```python
+from scripts.game_actions import SF2GameActions
+
+actions = SF2GameActions()
+actions.connect()
+
+# Query status: returns {'scene': 'FightScene', 'in_fight': True, 'is_paused': False, 'ticks': 120}
+status = actions.get_status()
+
+# Control combat flow with zero screen taps
+actions.pause()
+actions.resume()
+actions.exit_fight()
+
+actions.disconnect()
+```
+
+
