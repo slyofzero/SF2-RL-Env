@@ -23,7 +23,7 @@ APKTOOL_SRC = os.path.join(CACHE_DIR, "apktool_src")
 APKTOOL_JAR = os.path.join(ROOT_DIR, "modding", "tools", "apktool.jar")
 UBER_SIGNER = os.path.join(ROOT_DIR, "modding", "tools", "uber-apk-signer.jar")
 CAT_ICON_SRC = os.path.join(ROOT_DIR, "modding", "assets", "icons", "cat_blasters_icon_512.png")
-OUTPUT_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v4.apk")
+OUTPUT_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v6.apk")
 ORIGINAL_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_OG.apk")
 
 # Configuration: Number of rounds to win per match (default: 5)
@@ -35,12 +35,20 @@ def arm64_movz(rd: int, imm16: int) -> bytes:
     val = (0x52800000) | ((imm16 & 0xffff) << 5) | (rd & 0x1f)
     return val.to_bytes(4, 'little')
 
-# Protection rule: SF2_Modded_v1.apk, SF2_Modded_v2.apk, and SF2_Modded_v3.apk must NEVER be overwritten!
+# Protection rule: SF2_Modded_v1.apk through v5.apk must NEVER be overwritten!
 PROTECTED_V1_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v1.apk")
 PROTECTED_V2_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v2.apk")
 PROTECTED_V3_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v3.apk")
-if os.path.abspath(OUTPUT_APK) in (os.path.abspath(PROTECTED_V1_APK), os.path.abspath(PROTECTED_V2_APK), os.path.abspath(PROTECTED_V3_APK)):
-    raise ValueError("SF2_Modded_v1.apk, v2.apk, and v3.apk are protected historical milestones and must NEVER be overwritten. Target v4 or higher!")
+PROTECTED_V4_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v4.apk")
+PROTECTED_V5_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v5.apk")
+if os.path.abspath(OUTPUT_APK) in (
+    os.path.abspath(PROTECTED_V1_APK),
+    os.path.abspath(PROTECTED_V2_APK),
+    os.path.abspath(PROTECTED_V3_APK),
+    os.path.abspath(PROTECTED_V4_APK),
+    os.path.abspath(PROTECTED_V5_APK),
+):
+    raise ValueError("SF2_Modded_v1 through v5 are protected milestones! Target v6 or higher!")
 
 # Mapping of Dojo Unity textures
 TARGET_ASSETS = {
@@ -95,10 +103,14 @@ def main():
     args, _ = parser.parse_known_args()
     rounds = args.rounds
     output_apk = OUTPUT_APK
-    if args.output:
-        output_apk = os.path.abspath(args.output) if os.path.isabs(args.output) else os.path.join(ROOT_DIR, "bluestacks", "apks", args.output)
-    if os.path.abspath(output_apk) in (os.path.abspath(PROTECTED_V1_APK), os.path.abspath(PROTECTED_V2_APK), os.path.abspath(PROTECTED_V3_APK)):
-        raise ValueError("SF2_Modded_v1.apk, v2.apk, and v3.apk are protected historical milestones and must NEVER be overwritten. Target v4 or higher!")
+    if os.path.abspath(output_apk) in (
+        os.path.abspath(PROTECTED_V1_APK),
+        os.path.abspath(PROTECTED_V2_APK),
+        os.path.abspath(PROTECTED_V3_APK),
+        os.path.abspath(PROTECTED_V4_APK),
+        os.path.abspath(PROTECTED_V5_APK),
+    ):
+        raise ValueError("SF2_Modded_v1 through v5 are protected milestones! Target v6 or higher!")
     print(f"=== Configuring APK with ROUNDS_TO_WIN = {rounds} -> {os.path.basename(output_apk)} ===")
 
     print("=== Step 1: Decompiling original APK if needed ===")
@@ -226,8 +238,8 @@ def main():
         0x3437afc: ("Disable Google Play check (JFGBPBOCOIC)", bytes.fromhex("00008052c0035fd6")), # mov w0, #0; ret
         0x32d9388: ("Bypass ShowGDPR dialog (LJBDMDHNKFM.JFGBPBOCOIC)", bytes.fromhex("00008052c0035fd6")), # mov w0, #0; ret
         0x325bd24: ("Disable CheckPacksNeeded (AAPGCAPGBLG.MCFHOHANNDH)", bytes.fromhex("00008052c0035fd6")), # mov w0, #0; ret
-        0x2ff0a10: ("Hook for default Map scene redirect", bytes.fromhex("290d40b93f0d0071aa0080524991891a0f030014")), # ldr w9; cmp w9, #3; mov w10, #5; csel w9, w10, w9, ls; b 0x2ff165c
-        0x2ff1658: ("Redirect scene load to Map hook", bytes.fromhex("eefcff17")), # b 0x2ff0a10
+        0x2ff0a10: ("Hook for one-time default Map scene redirect", bytes.fromhex("290d40b9aab400904b0148b9cb0000352b0080524b0108b93f0d007141000054a9008052692a00b90a030014")),
+        0x2ff1658: ("Redirect scene load to one-time Map hook", bytes.fromhex("eefcff17")), # b 0x2ff0a10
         0x1cc5b44: ("Restore raid energy check (IEICNBBBNEJ.EHLKEFJNKPA)", bytes.fromhex("fe0f1ef8f44f01a9")),
         0x3414c4c: ("Restore CIHKNMDAPBG instruction", bytes.fromhex("f44f44a9")),
         0x296bd44: ("Restore Scene<object>.Update ret", bytes.fromhex("c0035fd6")),

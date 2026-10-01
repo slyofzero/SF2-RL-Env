@@ -25,6 +25,8 @@ PRESETS = {
     "lynx": (710, 500),          # Lynx Map Pin
     "menu-open": (211, 150),     # Top-Left Menu Scroll
     "menu-close": (237, 1021),   # Top-Left Menu Scroll
+    "menu-dojo": (115, 190),     # Top-Left Menu -> Dojo Pagoda icon
+    "menu-map": (115, 350),      # Top-Left Menu -> Act Map icon
     "energy": (415, 45),         # Top Energy Bar / VIP Icon
     "back": (80, 80),            # Back Arrow / Escape
     "dialog_ok": (400, 930),     # Post-Match OK button
