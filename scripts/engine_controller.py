@@ -350,6 +350,15 @@ class SF2EngineController:
         self.attack_done_event = threading.Event()
 
     def connect(self) -> bool:
+        # Auto-establish ADB port forward (safe to re-run; no-op if already active)
+        try:
+            subprocess.run(
+                [ADB_PATH, "forward", f"tcp:{self.port}", f"tcp:{self.port}"],
+                capture_output=True, timeout=5
+            )
+        except Exception:
+            pass  # If ADB isn't found, let Frida give the real error below
+
         print(f"Connecting to Frida Gadget on 127.0.0.1:{self.port}...")
         try:
             device_manager = frida.get_device_manager()

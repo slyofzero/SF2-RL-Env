@@ -59,7 +59,10 @@ Shadow Fight 2/
 ├── scripts/                           <-- Lifecycle & ADB automation scripts
 │   ├── common.py                      <-- Shared ADB detection, install & launch logic
 │   ├── install.py                     <-- Checks installation & installs APK if missing
-│   └── boot.py                        <-- Checks installation & boots game
+│   ├── boot.py                        <-- Checks installation & boots game
+│   ├── tap.py                         <-- Interactive ADB touch/tap helper
+│   ├── engine_controller.py           <-- Native IL2CPP action controller (Frida RPC)
+│   └── test_engine_api.py             <-- Live telemetry streamer (HP, position, hit events)
 ├── README.md                          <-- Quick-start overview
 ├── .venv/                             <-- Isolated Python 3.12 environment (uv managed)
 │
@@ -88,7 +91,8 @@ Shadow Fight 2/
     │   ├── 04_SAVE_PROFILES_AND_PROGRESSION.md
     │   ├── 05_OFFLINE_BUNDLES_AND_CDN.md
     │   ├── 06_STARTUP_SMALI_HOOK.md
-    │   └── 07_BUILD_AND_SIGNING_PIPELINE.md
+    │   ├── 07_BUILD_AND_SIGNING_PIPELINE.md
+    │   └── 08_ENGINE_CONTROLLER_AND_RL_HARNESS.md
     ├── packages/                      <-- Upstream and repacked packages
     │   ├── Shadow+Fight+2_2.46.0_APKPure.xapk      (Original multi-split XAPK)
     │   └── Shadow_Fight_2_Modded_Cyberpunk.xapk    (Modified multi-split XAPK)

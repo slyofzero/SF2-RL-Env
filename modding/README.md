@@ -64,6 +64,15 @@ Explore the dedicated documentation files for deep-dive technical explanations:
    * Rebranding mechanics and exact-byte metadata preservation.
    * Zip alignment and multi-scheme (v1/v2/v3) signing.
 
+8. **[08_ENGINE_CONTROLLER_AND_RL_HARNESS.md](docs/08_ENGINE_CONTROLLER_AND_RL_HARNESS.md)**
+   * All IL2CPP function RVAs for native action dispatch (`actDown`, `actUp`, `setTimeScale`).
+   * The quadrant system (absolute IDs 1–10 + relative codes -2 to -7).
+   * Full state machine specifications: movement, dash, and attack phases.
+   * Complete calibrated action vocabulary (movements, compound moves, attacks, combos, diagonal kicks).
+   * Python `SF2EngineController` API reference.
+   * Simulation speed control and tick-invariant design for RL training.
+   * Frida Gadget connection setup and known gotchas.
+
 ---
 
 ## 3. Directory Layout
@@ -78,7 +87,8 @@ modding/
 │   ├── 04_SAVE_PROFILES_AND_PROGRESSION.md
 │   ├── 05_OFFLINE_BUNDLES_AND_CDN.md
 │   ├── 06_STARTUP_SMALI_HOOK.md
-│   └── 07_BUILD_AND_SIGNING_PIPELINE.md
+│   ├── 07_BUILD_AND_SIGNING_PIPELINE.md
+│   └── 08_ENGINE_CONTROLLER_AND_RL_HARNESS.md
 ├── packages/                      <-- Original upstream XAPK packages
 ├── pipeline/                      <-- Executable build scripts
 │   ├── build_cat_blasters.py      <-- Master APK builder, patcher & signer
