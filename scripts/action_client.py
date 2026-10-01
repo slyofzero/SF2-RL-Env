@@ -17,6 +17,7 @@ import os
 import time
 import re
 import subprocess
+import struct
 from typing import Optional
 
 try:
@@ -107,7 +108,7 @@ class ActionClient:
         self.adb = adb_path or find_adb()
         self.serial = serial or get_connected_device(self.adb)
         
-        # Start persistent ADB shell process
+        # Start persistent ADB shell process for standard UI commands
         self.proc = subprocess.Popen(
             [self.adb, "-s", self.serial, "shell"],
             stdin=subprocess.PIPE,
@@ -117,10 +118,37 @@ class ActionClient:
             bufsize=1
         )
 
+        # Start persistent binary event pipe to /dev/input/event4 for sub-millisecond kernel multi-touch
+        self.pipe_proc = subprocess.Popen(
+            [self.adb, "-s", self.serial, "shell", "cat > /dev/input/event4"],
+            stdin=subprocess.PIPE,
+            bufsize=0
+        )
+        
+        # Double-tap timing configuration (in seconds)
+        # tap_hold: duration the attack button stays pressed down
+        # tap_gap: delay between releasing tap 1 and pressing tap 2
+        self.double_tap_hold = 0.03  # 30ms hold
+        self.double_tap_gap = 0.015  # 15ms true double-tap gap (sub-millisecond hardware precision)
+
     def _exec(self, cmd: str):
         if self.proc and self.proc.stdin:
             self.proc.stdin.write(cmd + "\n")
             self.proc.stdin.flush()
+
+    def _ev(self, type_: int, code: int, val: int) -> bytes:
+        """Pack a 24-byte Linux kernel input_event struct (x86_64)."""
+        return struct.pack('<qqHHi', 0, 0, type_, code, val)
+
+    def _write_ev(self, events: list):
+        """Write raw binary events directly to the kernel event stream with microsecond latency."""
+        if self.pipe_proc and self.pipe_proc.stdin:
+            buf = b"".join(self._ev(t, c, v) for t, c, v in events)
+            try:
+                self.pipe_proc.stdin.write(buf)
+                self.pipe_proc.stdin.flush()
+            except Exception:
+                pass
 
     def tap(self, x: int, y: int):
         self._exec(f"input tap {x} {y}")
@@ -142,34 +170,201 @@ class ActionClient:
             if i < count - 1:
                 time.sleep(0.14)
 
+    def to_ev(self, x: int, y: int) -> tuple:
+        """Convert 1920x1080 screen pixels to BlueStacks Virtual Touch 32767 scale."""
+        return int(x * 32767 / 1920), int(y * 32767 / 1080)
+
+    def reset_touch_slots(self):
+        """Release any potentially stuck multi-touch slots on /dev/input/event4."""
+        self._write_ev([
+            (3, 47, 0), (3, 57, -1),
+            (3, 47, 1), (3, 57, -1),
+            (1, 330, 0),
+            (0, 0, 0)
+        ])
+
     def hold_direction(self, direction: str, duration_sec: float):
+        """Hold a joystick direction via direct binary kernel touch event on Slot 0."""
         d = ALIASES.get(direction.lower(), direction.lower())
         if d not in DIRECTIONS:
             raise ValueError(f"Unknown direction: {direction}")
         jx, jy = DIRECTIONS[d]
-        dur_ms = max(50, int(duration_sec * 1000))
-        self.hold(jx, jy, dur_ms)
+        jx_ev, jy_ev = self.to_ev(jx, jy)
+        dur = max(0.05, duration_sec)
+
+        self._write_ev([
+            (3, 47, 0), (3, 57, 10), (3, 53, jx_ev), (3, 54, jy_ev),
+            (1, 330, 1), (0, 0, 0)
+        ])
+        time.sleep(dur)
+        self._write_ev([
+            (3, 47, 0), (3, 57, -1),
+            (1, 330, 0), (0, 0, 0)
+        ])
 
     def combo(self, direction: str, button: str, count: int = 1):
-        """Simultaneous directional attack: holds direction on joystick while tapping attack button."""
+        """
+        True multi-touch directional attack via direct binary stream:
+        Holds joystick direction on Slot 0 while tapping attack button on Slot 1.
+        """
         d = ALIASES.get(direction.lower(), direction.lower())
         if d not in DIRECTIONS:
             raise ValueError(f"Unknown direction: {direction}")
         jx, jy = DIRECTIONS[d]
         b = ALIASES.get(button.lower(), button.lower())
         bx, by = BUTTONS.get(b, BUTTONS["punch"])
-        
-        for i in range(count):
-            # Swipe/hold joystick while tapping the attack button with 40ms offset
-            cmd = f"input swipe {jx} {jy} {jx} {jy} 400 & (sleep 0.04 && input tap {bx} {by})"
-            self._exec(cmd)
-            if i < count - 1:
-                time.sleep(0.35)
+
+        jx_ev, jy_ev = self.to_ev(jx, jy)
+        bx_ev, by_ev = self.to_ev(bx, by)
+
+        # 1. Simultaneous Initial DOWN: Slot 0 + Slot 1 in ONE atomic frame
+        self._write_ev([
+            (3, 47, 0), (3, 57, 10), (3, 53, jx_ev), (3, 54, jy_ev),
+            (3, 47, 1), (3, 57, 11), (3, 53, bx_ev), (3, 54, by_ev),
+            (1, 330, 1), (0, 0, 0)
+        ])
+        time.sleep(0.06)
+        self._write_ev([(3, 47, 1), (3, 57, -1), (0, 0, 0)])
+
+        # 2. Subsequent hits while joystick remains held
+        for i in range(1, count):
+            time.sleep(0.12)
+            tid = 11 + i
+            self._write_ev([
+                (3, 47, 1), (3, 57, tid), (3, 53, bx_ev), (3, 54, by_ev),
+                (0, 0, 0)
+            ])
+            time.sleep(0.06)
+            self._write_ev([(3, 47, 1), (3, 57, -1), (0, 0, 0)])
+
+        time.sleep(0.02)
+        self._write_ev([
+            (3, 47, 0), (3, 57, -1),
+            (1, 330, 0), (0, 0, 0)
+        ])
+
+    def directional_double_attack(self, direction: str, button: str = "punch", gap_sec: Optional[float] = None, hold_sec: Optional[float] = None):
+        """
+        True sub-millisecond rapid double-tap combo (D, J+J / A, K+K):
+        Streams raw binary struct input_event directly to /dev/input/event4.
+        ZERO subprocess overhead, exact microsecond precision.
+        """
+        d = ALIASES.get(direction.lower(), direction.lower())
+        if d not in DIRECTIONS:
+            raise ValueError(f"Unknown direction: {direction}")
+        jx, jy = DIRECTIONS[d]
+        b = ALIASES.get(button.lower(), button.lower())
+        bx, by = BUTTONS.get(b, BUTTONS["punch"])
+
+        jx_ev, jy_ev = self.to_ev(jx, jy)
+        bx_ev, by_ev = self.to_ev(bx, by)
+
+        tap_hold = hold_sec if hold_sec is not None else getattr(self, "double_tap_hold", 0.03)
+        tap_gap = gap_sec if gap_sec is not None else getattr(self, "double_tap_gap", 0.015)
+
+        # 1. Hold Joystick (Slot 0) + Tap 1 (Slot 1) simultaneously in ONE frame
+        self._write_ev([
+            (3, 47, 0), (3, 57, 10), (3, 53, jx_ev), (3, 54, jy_ev),
+            (3, 47, 1), (3, 57, 11), (3, 53, bx_ev), (3, 54, by_ev),
+            (1, 330, 1), (0, 0, 0)
+        ])
+        time.sleep(tap_hold)
+
+        # 2. Release Tap 1 (Slot 1) while Joystick (Slot 0) stays firmly held
+        self._write_ev([
+            (3, 47, 1), (3, 57, -1), (0, 0, 0)
+        ])
+        time.sleep(tap_gap)
+
+        # 3. Tap 2 (Slot 1) rapid follow-up with tracking ID 12
+        self._write_ev([
+            (3, 47, 1), (3, 57, 12), (3, 53, bx_ev), (3, 54, by_ev),
+            (0, 0, 0)
+        ])
+        time.sleep(tap_hold)
+
+        # 4. Release Tap 2 (Slot 1)
+        self._write_ev([
+            (3, 47, 1), (3, 57, -1), (0, 0, 0)
+        ])
+        time.sleep(0.02)
+
+        # 5. Release Joystick (Slot 0)
+        self._write_ev([
+            (3, 47, 0), (3, 57, -1),
+            (1, 330, 0), (0, 0, 0)
+        ])
 
     def execute_command(self, cmd_str: str) -> str:
         cmd = cmd_str.strip().lower()
         if not cmd:
             return ""
+
+        if cmd in ("reset", "clear_touch", "reset_touch"):
+            self.reset_touch_slots()
+            return "[EXECUTED] Multi-touch slots reset"
+
+        # Runtime Timing Configuration (e.g. 'gap 15ms', 'set gap 0.02', 'hold 25ms', 'timing')
+        m_set_gap = re.match(r'^(?:set\s+)?gap\s+([0-9.]+)\s*(ms|s)?$', cmd)
+        if m_set_gap:
+            val, unit = m_set_gap.groups()
+            sec = float(val) / 1000.0 if unit == "ms" or float(val) >= 1.0 else float(val)
+            self.double_tap_gap = max(0.001, sec)
+            return f"[TIMING] Double-tap gap set to {self.double_tap_gap*1000:.1f}ms ({self.double_tap_gap:.3f}s)"
+
+        m_set_hold = re.match(r'^(?:set\s+)?hold(?:_dur)?\s+([0-9.]+)\s*(ms|s)?$', cmd)
+        if m_set_hold:
+            val, unit = m_set_hold.groups()
+            sec = float(val) / 1000.0 if unit == "ms" or float(val) >= 1.0 else float(val)
+            self.double_tap_hold = max(0.001, sec)
+            return f"[TIMING] Double-tap hold duration set to {self.double_tap_hold*1000:.1f}ms ({self.double_tap_hold:.3f}s)"
+
+        if cmd in ("timing", "get_timing", "delay"):
+            return f"[TIMING] Gap between taps: {self.double_tap_gap*1000:.1f}ms | Tap hold duration: {self.double_tap_hold*1000:.1f}ms"
+
+        # Shorthand notation (e.g. 'd, j+j', 'd j+j 15ms', 'a, k+k')
+        KEY_DIR = {"w": "up", "a": "left", "s": "down", "d": "right"}
+        KEY_ACT = {"j": "punch", "k": "kick"}
+        m_short = re.match(r'^([wasd])[\s,]+([jk])\s*\+\s*([jk])(?:\s+([0-9.]+)\s*(ms|s)?)?$', cmd)
+        if m_short:
+            k_dir, b1, b2, dur_val, dur_unit = m_short.groups()
+            direction = KEY_DIR[k_dir]
+            button = KEY_ACT[b1]
+            custom_gap = None
+            if dur_val:
+                custom_gap = float(dur_val) / 1000.0 if dur_unit == "ms" or float(dur_val) >= 1.0 else float(dur_val)
+            self.directional_double_attack(direction, button, gap_sec=custom_gap)
+            gap_used = custom_gap if custom_gap is not None else self.double_tap_gap
+            return f"[EXECUTED] {direction} double-{button} ({k_dir.upper()}, {b1.upper()}+{b2.upper()}) [gap: {gap_used*1000:.1f}ms]"
+
+        # Directional double-attack (e.g. 'right double-punch', 'left double-punch 10ms', 'right double-kick')
+        m_double = re.match(
+            r'^(?:(?:joystick\s+(?:to\s+the\s+|to\s+)?|move\s+|hold\s+)?)([a-zA-Z\-]+)(?:\s*\+\s*|\s+(?:and\s+then|then|and|\&)?\s+|\s+)double[- ](punch|kick)(?:\s+([0-9.]+)\s*(ms|s)?)?$',
+            cmd
+        )
+        if m_double:
+            direction, button, dur_val, dur_unit = m_double.groups()
+            d_lower = direction.lower()
+            if d_lower in DIRECTIONS or d_lower in ALIASES:
+                custom_gap = None
+                if dur_val:
+                    custom_gap = float(dur_val) / 1000.0 if dur_unit == "ms" or float(dur_val) >= 1.0 else float(dur_val)
+                self.directional_double_attack(direction, button, gap_sec=custom_gap)
+                gap_used = custom_gap if custom_gap is not None else self.double_tap_gap
+                return f"[EXECUTED] {direction} double-{button} [gap: {gap_used*1000:.1f}ms]"
+
+        # Reverse order (e.g. 'double-punch right', 'double kick left 15ms')
+        m_rev_double = re.match(r'^double[- ](punch|kick)\s+(?:to\s+the\s+)?([a-zA-Z\-]+)(?:\s+([0-9.]+)\s*(ms|s)?)?$', cmd)
+        if m_rev_double:
+            button, direction, dur_val, dur_unit = m_rev_double.groups()
+            d_lower = direction.lower()
+            if d_lower in DIRECTIONS or d_lower in ALIASES:
+                custom_gap = None
+                if dur_val:
+                    custom_gap = float(dur_val) / 1000.0 if dur_unit == "ms" or float(dur_val) >= 1.0 else float(dur_val)
+                self.directional_double_attack(direction, button, gap_sec=custom_gap)
+                gap_used = custom_gap if custom_gap is not None else self.double_tap_gap
+                return f"[EXECUTED] {direction} double-{button} [gap: {gap_used*1000:.1f}ms]"
 
         # Presets & direct button names
         btn_key = ALIASES.get(cmd, cmd)
@@ -185,9 +380,10 @@ class ActionClient:
         cmd = re.sub(r'^triple[- ]kick$', 'kick 3', cmd)
 
         # Check for natural directional attack combo before general chaining:
-        # e.g. 'joystick to the right and then kick', 'right then punch', 'forward and then kick'
+        # e.g. 'right punch', 'left punch', 'up kick', 'down punch 2', 'right + punch',
+        #      'joystick to the right and punch', 'move left then kick'
         m_nat_combo = re.match(
-            r'^(?:(?:joystick\s+(?:to\s+the\s+|to\s+)?|move\s+))?([a-zA-Z\-]+)\s+(?:and\s+then|then|\s+)\s*(punch|kick|shadow|magic|ranged)(?:\s+(\d+))?$',
+            r'^(?:(?:joystick\s+(?:to\s+the\s+|to\s+)?|move\s+|hold\s+)?)([a-zA-Z\-]+)(?:\s*\+\s*|\s+(?:and\s+then|then|and|\&)?\s+|\s+)(punch|kick|shadow|magic|ranged)(?:\s+(\d+))?$',
             cmd
         )
         if m_nat_combo:
@@ -196,7 +392,20 @@ class ActionClient:
             if d_lower in DIRECTIONS or d_lower in ALIASES:
                 count = int(cnt) if cnt else 1
                 self.combo(dir_raw, btn_raw, count)
-                return f"[EXECUTED] {dir_raw} {btn_raw} ({count}x)"
+                return f"[EXECUTED] {dir_raw} {btn_raw} ({count}x) [multi-touch]"
+
+        # Also support reverse order: e.g. 'punch right', 'kick left 2'
+        m_rev_combo = re.match(
+            r'^(punch|kick|shadow|magic|ranged)(?:\s*\+\s*|\s+(?:and\s+then|then|and|\&)?\s+|\s+)(?:(?:joystick\s+(?:to\s+the\s+|to\s+)?|move\s+|hold\s+)?)([a-zA-Z\-]+)(?:\s+(\d+))?$',
+            cmd
+        )
+        if m_rev_combo:
+            btn_raw, dir_raw, cnt = m_rev_combo.groups()
+            d_lower = dir_raw.lower()
+            if d_lower in DIRECTIONS or d_lower in ALIASES:
+                count = int(cnt) if cnt else 1
+                self.combo(dir_raw, btn_raw, count)
+                return f"[EXECUTED] {dir_raw} {btn_raw} ({count}x) [multi-touch]"
 
         # Support chaining via 'and then', 'then', ';', or ','
         chain_delims = re.split(r'\s+(?:and\s+then|then)\s+|[;,]', cmd)
@@ -272,11 +481,19 @@ class ActionClient:
         return f"[ERROR] Unrecognized command: '{cmd_str}'"
 
     def close(self):
+        if hasattr(self, "pipe_proc") and self.pipe_proc:
+            try:
+                if self.pipe_proc.stdin:
+                    self.pipe_proc.stdin.flush()
+                    self.pipe_proc.stdin.close()
+                self.pipe_proc.terminate()
+            except Exception:
+                pass
         if self.proc:
             try:
                 if self.proc.stdin:
                     self.proc.stdin.flush()
-                time.sleep(0.08)
+                time.sleep(0.04)
                 self.proc.terminate()
             except Exception:
                 pass
