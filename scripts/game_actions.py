@@ -199,6 +199,26 @@ class SF2GameActions:
         time.sleep(0.5)
         return done
 
+    def set_rounds(self, n: int) -> int:
+        """
+        Dynamically patches the number of rounds required to win a match (1–99).
+        Takes effect on the next fight start. No APK repack required.
+        """
+        if not self.is_connected or not self.script:
+            raise RuntimeError("Not connected to game engine.")
+        n = max(1, min(99, int(n)))
+        res = self.script.exports_sync.set_rounds(n)
+        if not res.get("success"):
+            raise RuntimeError(f"set_rounds failed: {res.get('error')}")
+        return res.get("rounds", n)
+
+    def get_rounds(self) -> Optional[int]:
+        """Returns the currently patched rounds-to-win value, or None if unset this session."""
+        if not self.is_connected or not self.script:
+            raise RuntimeError("Not connected to game engine.")
+        res = self.script.exports_sync.get_rounds()
+        return res.get("rounds")
+
     def disconnect(self):
         """Detaches from the Frida session."""
         if self.script:

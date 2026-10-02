@@ -74,6 +74,10 @@ class ShadowFightEnv:
 
         # Wait until round start auto-freeze fires (or timeout)
         frozen = self.clock.wait_for_auto_freeze(timeout=timeout)
+
+        # ── CRITICAL: Disarm immediately so subsequent round starts don't re-freeze ──
+        self.clock.enable_auto_freeze(False)
+
         if not frozen:
             # Fallback guarantee: ensure freeze is active
             self.clock.freeze()
@@ -163,6 +167,21 @@ class ShadowFightEnv:
         self.state = None
         return ok
 
+    def set_rounds(self, n: int) -> int:
+        """
+        Dynamically patches the rounds-to-win threshold (1–99) in the running engine.
+        No APK repack needed. Takes effect from the next fight start.
+        """
+        if not self._is_connected:
+            self.connect()
+        return self.actions.set_rounds(n)
+
+    def get_rounds(self) -> Optional[int]:
+        """Returns the currently patched rounds-to-win value for this session."""
+        if not self._is_connected:
+            self.connect()
+        return self.actions.get_rounds()
+
     def close(self):
         """Cleanly detaches from the game process and restores default state."""
         try:
@@ -220,6 +239,8 @@ def run_interactive(env: ShadowFightEnv):
     print("   pause             -> env.pause()")
     print("   resume            -> env.resume()")
     print("   exit              -> env.exit() (surrender / back to map)")
+    print("   rounds <N>        -> env.set_rounds(N) (1-99, takes effect next fight)")
+    print("   rounds            -> env.get_rounds() (show current setting)")
     print("   state / status    -> env.get_state() (full telemetry JSON log)")
     print("   q / quit          -> Exit console")
     print("=" * 80 + "\n")
@@ -284,11 +305,19 @@ def run_interactive(env: ShadowFightEnv):
         elif lower in ("state", "status"):
             st = env.get_state()
             print(json.dumps(st, indent=2))
+        elif lower.startswith("rounds"):
+            parts = lower.split()
+            if len(parts) >= 2 and parts[1].isdigit():
+                r = env.set_rounds(int(parts[1]))
+                print(f"[OK] Rounds to win set to {r} (takes effect on next fight start)")
+            else:
+                cur = env.get_rounds()
+                print(f"[OK] Current rounds-to-win: {cur if cur is not None else 'default (unset this session)'}")
         elif lower in ACTION_MAP:
             st = env.step(steps=6, action=lower)
             print(format_telemetry_line(st, prefix=f" -> [{lower.upper():4s} 6t]   "))
         else:
-            print(f"Unknown command: '{cmd}'. Try 'start', 'step <N>', 'freeze', 'speed <N>', 'pause', 'exit', 'state', 'q'")
+            print(f"Unknown command: '{cmd}'. Try 'start', 'step <N>', 'freeze', 'speed <N>', 'rounds <N>', 'pause', 'exit', 'state', 'q'")
 
 
 def main():

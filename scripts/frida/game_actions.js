@@ -186,7 +186,54 @@ if (!il2cppBase) {
         }
     });
 
+    // ── Round Count Patcher ──────────────────────────────────────────────────
+    // The ELF file offsets in APK (0x33E7D80, 0x33E9444, 0x33EA8E4) are mapped
+    // into virtual runtime memory with a +0x4000 ELF load bias (p_vaddr - p_offset):
+    //   0x33EBD80 - FCJBEKHDLAF.DHKCOFBMIEL  -> mov w22, #N  (match victory target)
+    //   0x33ED444 - FCJBEKHDLAF.AIFOMGABBBA  -> mov w8,  #N  (round end threshold)
+    //   0x33EE8E4 - FCJBEKHDLAF.LPIEJMLPFBF  -> mov w1,  #N  (RoundModel target)
+    var roundPatches = [
+        { rva: 0x33EBD80, reg: 22 },  // mov w22, #N
+        { rva: 0x33ED444, reg: 8  },  // mov w8,  #N
+        { rva: 0x33EE8E4, reg: 1  },  // mov w1,  #N
+    ];
+    var currentRounds = null;
+
+    // Safety: restore original instructions if previously patched at raw file offsets
+    try {
+        Memory.patchCode(il2cppBase.add(0x33e7d80), 4, function(code) { code.writeU32(0xb0006b00); });
+        Memory.patchCode(il2cppBase.add(0x33e9444), 4, function(code) { code.writeU32(0x52800021); });
+        Memory.patchCode(il2cppBase.add(0x33ea8e4), 4, function(code) { code.writeU32(0x979b03f9); });
+    } catch(e) {}
+
+    function arm64Movz(reg, imm) {
+        // MOVZ Wd, #imm  =>  0x52800000 | (imm << 5) | reg
+        return (0x52800000 | ((imm & 0xFFFF) << 5) | (reg & 0x1F)) >>> 0;
+    }
+
+    function patchRounds(n) {
+        for (var i = 0; i < roundPatches.length; i++) {
+            (function(addr, instr) {
+                Memory.patchCode(addr, 4, function(code) {
+                    code.writeU32(instr);
+                });
+            })(il2cppBase.add(roundPatches[i].rva), arm64Movz(roundPatches[i].reg, n));
+        }
+        currentRounds = n;
+    }
+
     rpc.exports = {
+        setRounds: function(n) {
+            try {
+                patchRounds(n);
+                return { success: true, rounds: currentRounds };
+            } catch(e) {
+                return { success: false, error: e.toString() };
+            }
+        },
+        getRounds: function() {
+            return { rounds: currentRounds };
+        },
         pause: function() {
             if (!inFight || !battleCtrl || battleCtrl.isNull()) {
                 return { success: false, error: "Not in active fight (current scene: " + currentSceneName + ")" };
