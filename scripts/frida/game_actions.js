@@ -44,92 +44,144 @@ if (!il2cppBase) {
     var pendingAction = null;
     var actionResult = null;
 
-    // Hook Scene<object>.Update (RVA 0x296FD44) - Runs at 60Hz across all scenes
-    var sceneUpdateAddr = il2cppBase.add(0x296FD44);
-    Interceptor.attach(sceneUpdateAddr, {
-        onEnter: function(args) {
-            currentScene = args[0];
-            lastUpdateTick++;
+    // Shared BSS address for persisting active battle pointers across script connections
+    var sharedBss = il2cppBase.add(0x445f020);
+    // [0x0]: battleCtrl, [0x8]: currentScene, [0x10]: preFight
+    try {
+        var savedCtrl = sharedBss.readPointer();
+        if (!savedCtrl.isNull()) {
+            battleCtrl = savedCtrl;
+            currentScene = sharedBss.add(8).readPointer();
+            preFight = sharedBss.add(16).readPointer();
+            inFight = true;
+            currentSceneName = "FightScene";
+            if (!preFight.isNull()) {
+                var pauseScreenPtr = preFight.add(0x90).readPointer();
+                isPaused = (!pauseScreenPtr.isNull());
+            }
+        }
+    } catch(e) {}
 
+    function processFightFrame(scenePtr) {
+        currentScene = scenePtr;
+        currentSceneName = "FightScene";
+        inFight = true;
+        lastUpdateTick++;
+
+        try {
+            var bCtrl = currentScene.add(0x90).readPointer();
+            var pFight = currentScene.add(0x98).readPointer();
+
+            if (!bCtrl.isNull() && !pFight.isNull()) {
+                battleCtrl = bCtrl;
+                preFight = pFight;
+
+                // Save to persistent BSS
+                sharedBss.writePointer(bCtrl);
+                sharedBss.add(8).writePointer(currentScene);
+                sharedBss.add(16).writePointer(pFight);
+
+                var pauseScreenPtr = preFight.add(0x90).readPointer();
+                isPaused = (!pauseScreenPtr.isNull());
+
+                if (pendingAction !== null) {
+                    executeQueuedAction();
+                }
+            }
+        } catch(e) {
+            battleCtrl = null;
+            preFight = null;
+        }
+    }
+
+    function processMapFrame(scenePtr) {
+        currentScene = scenePtr;
+        currentSceneName = "MapScene";
+        inFight = false;
+        isPaused = false;
+        battleCtrl = null;
+        preFight = null;
+        lastUpdateTick++;
+
+        // Clear BSS when on Map
+        try {
+            sharedBss.writePointer(ptr(0));
+        } catch(e) {}
+
+        if (pendingAction === 'start_fight') {
+            pendingAction = null;
             try {
-                // Determine active scene type via IL2CPP class reflection
-                var klass = currentScene.readPointer();
-                var namePtr = klass.add(0x10).readPointer();
-                currentSceneName = namePtr.readCString();
-
-                if (currentSceneName === "FightScene") {
-                    inFight = true;
-                    // In FightScene, 0x90 is battleCtrl (FCJBEKHDLAF) and 0x98 is PreFight
-                    var bCtrl = currentScene.add(0x90).readPointer();
-                    var pFight = currentScene.add(0x98).readPointer();
-
-                    if (!bCtrl.isNull() && !pFight.isNull()) {
-                        battleCtrl = bCtrl;
-                        preFight = pFight;
-
-                        // PauseScreen pointer is at preFight + 0x90
-                        var pauseScreenPtr = preFight.add(0x90).readPointer();
-                        isPaused = (!pauseScreenPtr.isNull());
-
-                        // Execute queued action on the main thread
-                        if (pendingAction !== null) {
-                            var act = pendingAction;
-                            pendingAction = null;
-
-                            if (act === 'pause') {
-                                // ButtonPause = 0
-                                onButtonAction(battleCtrl, 0);
-                                actionResult = { action: 'pause', success: true };
-                                send({ event: 'action_completed', action: 'pause', success: true });
-                            } else if (act === 'resume') {
-                                // ButtonPausePlay = 2
-                                onButtonAction(battleCtrl, 2);
-                                actionResult = { action: 'resume', success: true };
-                                send({ event: 'action_completed', action: 'resume', success: true });
-                            } else if (act === 'exit') {
-                                // Direct Surrender = -1 (Immediately terminates fight and exits to Map)
-                                surrenderAction(battleCtrl, -1);
-                                actionResult = { action: 'exit', success: true };
-                                send({ event: 'action_completed', action: 'exit', success: true });
-                            } else if (act === 'start_fight') {
-                                restartFight(currentScene);
-                                actionResult = { action: 'start_fight', success: true, restarted: true };
-                                send({ event: 'action_completed', action: 'start_fight', success: true, restarted: true });
-                            }
-                        }
-                    }
-                } else if (currentSceneName === "MapScene") {
-                    inFight = false;
-                    isPaused = false;
-                    battleCtrl = null;
-                    preFight = null;
-
-                    if (pendingAction === 'start_fight') {
-                        pendingAction = null;
-                        try {
-                            var infoBattle = currentScene.add(0xD0).readPointer();
-                            if (!infoBattle.isNull()) {
-                                onFightButtonClick(infoBattle);
-                                actionResult = { action: 'start_fight', success: true };
-                                send({ event: 'action_completed', action: 'start_fight', success: true });
-                            } else {
-                                send({ event: 'action_completed', action: 'start_fight', success: false, error: "InfoBattle pointer is null" });
-                            }
-                        } catch(e) {
-                            send({ event: 'action_completed', action: 'start_fight', success: false, error: e.toString() });
-                        }
-                    }
+                var infoBattle = currentScene.add(0xD0).readPointer();
+                if (!infoBattle.isNull()) {
+                    onFightButtonClick(infoBattle);
+                    actionResult = { action: 'start_fight', success: true };
+                    send({ event: 'action_completed', action: 'start_fight', success: true });
                 } else {
-                    inFight = false;
-                    isPaused = false;
-                    battleCtrl = null;
-                    preFight = null;
+                    send({ event: 'action_completed', action: 'start_fight', success: false, error: "InfoBattle pointer is null" });
                 }
             } catch(e) {
+                send({ event: 'action_completed', action: 'start_fight', success: false, error: e.toString() });
+            }
+        }
+    }
+
+    function executeQueuedAction() {
+        if (!pendingAction) return;
+        var act = pendingAction;
+        pendingAction = null;
+
+        if (act === 'pause') {
+            if (battleCtrl && !battleCtrl.isNull()) {
+                onButtonAction(battleCtrl, 0);
+                actionResult = { action: 'pause', success: true };
+                send({ event: 'action_completed', action: 'pause', success: true });
+            }
+        } else if (act === 'resume') {
+            if (battleCtrl && !battleCtrl.isNull()) {
+                onButtonAction(battleCtrl, 2);
+                isPaused = false;
+                actionResult = { action: 'resume', success: true };
+                send({ event: 'action_completed', action: 'resume', success: true });
+            }
+        } else if (act === 'exit') {
+            if (battleCtrl && !battleCtrl.isNull()) {
+                surrenderAction(battleCtrl, -1);
                 inFight = false;
                 isPaused = false;
-                battleCtrl = null;
-                preFight = null;
+                actionResult = { action: 'exit', success: true };
+                send({ event: 'action_completed', action: 'exit', success: true });
+            }
+        } else if (act === 'start_fight') {
+            if (currentScene && !currentScene.isNull()) {
+                restartFight(currentScene);
+                actionResult = { action: 'start_fight', success: true, restarted: true };
+                send({ event: 'action_completed', action: 'start_fight', success: true, restarted: true });
+            }
+        }
+    }
+
+    // 1. Hook FightScene.FixedUpdate (RVA 0x3237268)
+    var fightFixedUpdateAddr = il2cppBase.add(0x3237268);
+    Interceptor.attach(fightFixedUpdateAddr, {
+        onEnter: function(args) {
+            processFightFrame(args[0]);
+        }
+    });
+
+    // 2. Hook MapScene.Update (RVA 0x3589494)
+    var mapUpdateAddr = il2cppBase.add(0x3589494);
+    Interceptor.attach(mapUpdateAddr, {
+        onEnter: function(args) {
+            processMapFrame(args[0]);
+        }
+    });
+
+    // 3. Hook GlobalTimer.Update (RVA 0x1D03DD0) - Runs at 60Hz even while combat is paused
+    var globalTimerUpdateAddr = il2cppBase.add(0x1D03DD0);
+    Interceptor.attach(globalTimerUpdateAddr, {
+        onEnter: function(args) {
+            if (pendingAction !== null && battleCtrl && !battleCtrl.isNull()) {
+                executeQueuedAction();
             }
         }
     });

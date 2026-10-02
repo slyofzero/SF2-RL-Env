@@ -1,0 +1,39 @@
+Metadata-Version: 2.4
+Name: shadow-fight-2-rl
+Version: 0.1.0
+Summary: Shadow Fight 2 Reinforcement Learning & Modding Harness
+Author: Ishan
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: frida>=16.0.0
+Requires-Dist: pillow>=10.0.0
+
+# Shadow Fight 2 - Reinforcement Learning & Modding Environment
+
+An automated environment for reverse engineering, modding, and training Reinforcement Learning (RL) agents on *Shadow Fight 2*.
+
+---
+
+## Quick Navigation
+
+* 📖 **[Master Documentation (.agents/AGENTS.md)](.agents/AGENTS.md)**: Master reverse engineering findings, live experiment log, and RL development roadmap.
+* 🛠️ **[Modding Documentation Hub (modding/)](modding/README.md)**: "Changing What Changes What" directory map and links to in-depth technical guides:
+  * [01. Architecture Overview](modding/docs/01_ARCHITECTURE_OVERVIEW.md)
+  * [02. Textures & Graphical Modding](modding/docs/02_TEXTURES_AND_GRAPHICS.md)
+  * [03. IL2CPP & ARM64 Binary Patching](modding/docs/03_IL2CPP_AND_BINARY_PATCHING.md)
+  * [04. Save Profiles & Progression](modding/docs/04_SAVE_PROFILES_AND_PROGRESSION.md)
+  * [05. Offline Asset Bundles & CDN](modding/docs/05_OFFLINE_BUNDLES_AND_CDN.md)
+  * [06. Startup Smali Hook & Self-Extractor](modding/docs/06_STARTUP_SMALI_HOOK.md)
+  * [07. Build & Signing Pipeline](modding/docs/07_BUILD_AND_SIGNING_PIPELINE.md)
+* 🎮 **[BlueStacks Setup & Runtime (bluestacks/)](bluestacks/README.md)**: APK installation options, keymapper control restoration, and headless ADB scripts.
+
+---
+
+## Ready-to-Install APKs
+
+Located in `bluestacks/apks/`:
+* **`SF2_OG.apk`** (162.75 MB) — Untampered baseline game.
+* **`SF2_Modded_v1.apk`** (**333.23 MB**) — Fully modded build (Cat Blasters 9k) containing all 30 offline story/event bundles, level 52 equipment access save, custom Cyan Dojo visuals, skipped tutorials/cutscenes, and silenced startup dialogs.
+* *Note: `SF2_Modded_v1.apk` is an immutable milestone build. Future builds will generate `SF2_Modded_v2.apk`.*
+
+Simply drag either file into BlueStacks to install.

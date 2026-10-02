@@ -1,0 +1,6 @@
+[console_scripts]
+sf2-actions = scripts.game_actions:main
+sf2-env = rl_env.shadow_fight_env:main
+sf2-frida = scripts.start_frida_service:main
+sf2-telemetry = scripts.stream_telemetry:main
+sf2-tick = scripts.tick_controller:main

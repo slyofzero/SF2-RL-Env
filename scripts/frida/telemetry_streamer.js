@@ -223,12 +223,44 @@ if (!il2cppBase) {
             try {
                 var endType = args[3].toInt32();
                 var winner = "unknown";
-                var reason = "normal";
-                if (endType === 1) { winner = "player"; reason = "knockout"; }
-                else if (endType === 2) { winner = "opponent"; reason = "knockout"; }
-                else if (endType === 3) { winner = "timeout"; reason = "time_expired"; }
-                else if (endType === 4) { reason = "ring_out"; }
-                else if (endType === 5) { winner = "draw"; reason = "zero_health"; }
+                var reason = "knockout";
+
+                var hp1 = lastP1Hp;
+                var hp2 = lastP2Hp;
+
+                if (endType === 3) {
+                    reason = "timeout";
+                    if (hp1 > hp2) winner = "player";
+                    else if (hp2 > hp1) winner = "opponent";
+                    else winner = "draw";
+                } else if (endType === 4) {
+                    reason = "ring_out";
+                    if (hp1 > hp2) winner = "player";
+                    else if (hp2 > hp1) winner = "opponent";
+                    else winner = "draw";
+                } else if (endType === 5) {
+                    winner = "draw";
+                    reason = "zero_health";
+                } else {
+                    // Knockout (endType 0, 1, 2)
+                    if (hp2 <= 0.001 && hp1 > 0.001) {
+                        winner = "player";
+                        reason = "knockout";
+                    } else if (hp1 <= 0.001 && hp2 > 0.001) {
+                        winner = "opponent";
+                        reason = "knockout";
+                    } else if (hp1 <= 0.001 && hp2 <= 0.001) {
+                        winner = "draw";
+                        reason = "zero_health";
+                    } else if (endType === 1) {
+                        winner = "player";
+                    } else if (endType === 2) {
+                        winner = "opponent";
+                    } else {
+                        if (hp1 > hp2) winner = "player";
+                        else if (hp2 > hp1) winner = "opponent";
+                    }
+                }
 
                 send({
                     type: "ROUND_END",

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shadow-fight-2-rl"
+version = "0.1.0"
+description = "Shadow Fight 2 Reinforcement Learning & Modding Harness"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Ishan" }]
+dependencies = [
+    "frida>=16.0.0",
+    "pillow>=10.0.0",
+]
+
+[project.scripts]
+sf2-env = "rl_env.shadow_fight_env:main"
+sf2-frida = "scripts.start_frida_service:main"
+sf2-actions = "scripts.game_actions:main"
+sf2-tick = "scripts.tick_controller:main"
+sf2-telemetry = "scripts.stream_telemetry:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["rl_env*", "scripts*"]
