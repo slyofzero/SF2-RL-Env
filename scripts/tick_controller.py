@@ -155,6 +155,8 @@ class SF2TickController:
                 elif ev == "auto_frozen_on_round_start":
                     self._last_state = payload.get("state", {})
                     self._auto_freeze_event.set()
+        elif message.get("type") == "error":
+            print(f"[JS ERROR] {message.get('stack', message)}", file=sys.stderr)
 
     def freeze(self) -> bool:
         """Freezes combat physics and match countdown clock in place."""

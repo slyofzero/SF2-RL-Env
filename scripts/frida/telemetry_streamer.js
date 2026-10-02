@@ -262,12 +262,33 @@ if (!il2cppBase) {
         return (n || "").replace(/^NAME_/, "");
     }
 
+    // Shared In-Memory Process Synchronization Slot (synced with tick_controller.js)
+    var sharedTickStateAddr = il2cppBase.add(0x445f000);
+    // [0x0]: is_frozen (int32), [0x4]: total_ticks (int32), [0x8]: speed (float)
+    var lastReportedTick = -1;
+
     // 4. Master Physics Interceptor
     Interceptor.attach(masterTickAddr, {
         onEnter: function(args) {
             try {
                 // If game is paused or timeScale is 0, suppress all frame logs
                 if (isGamePaused || getTimeScale() === 0.0) {
+                    return;
+                }
+
+                // Check synchronized tick state with tick_controller
+                var isFrozen = (sharedTickStateAddr.readS32() === 1);
+                var engineTick = sharedTickStateAddr.add(4).readS32();
+
+                // Initialize baseline or handle tick counter reset
+                if (lastReportedTick === -1) {
+                    lastReportedTick = engineTick;
+                } else if (engineTick < lastReportedTick) {
+                    lastReportedTick = engineTick;
+                }
+
+                // When frozen: ONLY emit a frame if a tick was actually executed!
+                if (isFrozen && engineTick <= lastReportedTick) {
                     return;
                 }
 
@@ -409,7 +430,16 @@ if (!il2cppBase) {
                 var p1Facing = (p1_x <= p2_x) ? "RIGHT" : "LEFT";
                 var p2Facing = (p2_x <= p1_x) ? "RIGHT" : "LEFT";
 
-                tickIndex++;
+                // Determine tick counter: prefer engineTick from tick_controller if active, else fallback to tickIndex
+                var currentTick;
+                if (isFrozen || engineTick > 0) {
+                    currentTick = engineTick;
+                    lastReportedTick = engineTick;
+                } else {
+                    tickIndex++;
+                    currentTick = tickIndex;
+                    lastReportedTick = currentTick;
+                }
 
                 // Read remaining match round timer from ViewerFight (preFight+0x80)
                 var timeLeft = 99.0;
@@ -438,7 +468,7 @@ if (!il2cppBase) {
 
                 send({
                         type: "TELEMETRY_FRAME",
-                        tick: tickIndex,
+                        tick: currentTick,
                         timestamp: Date.now() / 1000.0,
                         time_left: timeLeft,
                         player: {

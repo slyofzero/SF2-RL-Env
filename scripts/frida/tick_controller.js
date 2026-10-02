@@ -122,6 +122,13 @@ if (!il2cppBase) {
         };
     }
 
+    // Shared In-Memory Process Synchronization Slot for telemetry_streamer
+    var sharedTickStateAddr = il2cppBase.add(0x445f000);
+    // [0x0]: is_frozen (int32), [0x4]: total_ticks (int32), [0x8]: speed (float)
+    sharedTickStateAddr.writeS32(0);
+    sharedTickStateAddr.add(4).writeS32(0);
+    sharedTickStateAddr.add(8).writeFloat(1.0);
+
     // Intercept Master Combat Loop
     var customFixedUpdate = new NativeCallback(function(thisPtr) {
         battleCtrlPtr = thisPtr;
@@ -129,6 +136,8 @@ if (!il2cppBase) {
         // If not frozen, execute normally at 60 Hz
         if (!isFrozen) {
             totalTicksExecuted++;
+            sharedTickStateAddr.writeS32(0);
+            sharedTickStateAddr.add(4).writeS32(totalTicksExecuted);
             origFixedUpdate(thisPtr);
             return;
         }
@@ -152,16 +161,25 @@ if (!il2cppBase) {
 
             ticksBudget--;
             totalTicksExecuted++;
+            // Write updated tick to shared memory so telemetry_streamer knows a tick executed
+            sharedTickStateAddr.writeS32(1);
+            sharedTickStateAddr.add(4).writeS32(totalTicksExecuted);
             origFixedUpdate(thisPtr);
 
             if (ticksBudget === 0) {
                 var st = readState();
                 send({ event: "step_done", total_ticks: totalTicksExecuted, state: st });
             }
+        } else {
+            // Frozen: ensure flag is 1
+            sharedTickStateAddr.writeS32(1);
         }
         // If ticksBudget == 0: skip call, game stays frozen!
     }, 'void', ['pointer']);
 
+    try {
+        Interceptor.revert(fixedUpdateAddr);
+    } catch(e) {}
     Interceptor.replace(fixedUpdateAddr, customFixedUpdate);
 
     // Auto-freeze on Round Start (ViewerFight.Play - RVA 0x35BE050)
@@ -171,6 +189,7 @@ if (!il2cppBase) {
             if (autoFreezeOnRoundStart) {
                 isFrozen = true;
                 ticksBudget = 0;
+                sharedTickStateAddr.writeS32(1);
                 send({ event: "auto_frozen_on_round_start", state: readState() });
             }
         }
@@ -180,16 +199,19 @@ if (!il2cppBase) {
         freeze: function() {
             isFrozen = true;
             ticksBudget = 0;
+            sharedTickStateAddr.writeS32(1);
             return { success: true, frozen: isFrozen };
         },
         unfreeze: function() {
             isFrozen = false;
             ticksBudget = 0;
+            sharedTickStateAddr.writeS32(0);
             return { success: true, frozen: isFrozen };
         },
         step: function(numTicks, quad, button) {
             if (!isFrozen) {
                 isFrozen = true;
+                sharedTickStateAddr.writeS32(1);
             }
             if (quad > 0 || button > 0) {
                 pendingAction = { quad: quad, button: button };
