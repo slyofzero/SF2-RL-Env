@@ -6,6 +6,7 @@ Zero ADB or BlueStacks screen taps required. Fully headless-ready.
 
 Usage:
     CLI:
+        python scripts/game_actions.py start
         python scripts/game_actions.py resume
         python scripts/game_actions.py pause
         python scripts/game_actions.py exit
@@ -15,6 +16,7 @@ Usage:
         from scripts.game_actions import SF2GameActions
         actions = SF2GameActions()
         actions.connect()
+        actions.start_fight()
         actions.resume()
         actions.pause()
         actions.exit_fight()
@@ -169,6 +171,20 @@ class SF2GameActions:
         time.sleep(0.2)
         return done
 
+    def start_fight(self, timeout: float = 5.0) -> bool:
+        """Starts a fight from the MapScene, or restarts the match if already in FightScene."""
+        if not self.is_connected or not self.script:
+            raise RuntimeError("Not connected to game engine.")
+        self._action_event.clear()
+        res = self.script.exports_sync.start_fight()
+        if not res.get("success"):
+            print(f"[WARN] Start fight command failed: {res.get('error')}")
+            return False
+        # Wait for execution inside Update() loop
+        done = self._action_event.wait(timeout=timeout)
+        time.sleep(0.5)
+        return done
+
     def exit_fight(self, timeout: float = 3.0) -> bool:
         """Exits / surrenders the current fight natively via battleCtrl.LPIEJMLPFBF(-1)."""
         if not self.is_connected or not self.script:
@@ -202,7 +218,7 @@ class SF2GameActions:
 
 def main():
     parser = argparse.ArgumentParser(description="Shadow Fight 2 Native Game Actions Controller")
-    parser.add_argument("action", choices=["pause", "resume", "exit", "status"], help="Action to execute")
+    parser.add_argument("action", choices=["pause", "resume", "exit", "start", "status"], help="Action to execute")
     parser.add_argument("--host", type=str, default=None, help="Frida Gadget host (default: from FRIDA_HOST or 127.0.0.1)")
     parser.add_argument("--port", type=int, default=None, help="Frida Gadget port (default: from FRIDA_PORT or 27042)")
     args = parser.parse_args()
@@ -218,6 +234,10 @@ def main():
 
         if args.action == "status":
             pass
+        elif args.action == "start":
+            print("[ACTION] Triggering native start fight / restart...")
+            ok = controller.start_fight()
+            print(f"[RESULT] Start fight triggered: {ok}")
         elif args.action == "pause":
             print("[ACTION] Triggering native pause...")
             ok = controller.pause()

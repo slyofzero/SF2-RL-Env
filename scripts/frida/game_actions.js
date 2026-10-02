@@ -28,6 +28,12 @@ if (!il2cppBase) {
     // gameOverType: -1 = GAME_OVER_SURRENDER
     var surrenderAction = new NativeFunction(il2cppBase.add(0x33EE838), 'void', ['pointer', 'int']);
 
+    // InfoBattle.OnFightButtonClick(infoBattle) - RVA 0x3417184
+    var onFightButtonClick = new NativeFunction(il2cppBase.add(0x3417184), 'void', ['pointer']);
+
+    // FightScene.RestartFight(fightScene) - RVA 0x3237250
+    var restartFight = new NativeFunction(il2cppBase.add(0x3237250), 'void', ['pointer']);
+
     var currentScene = null;
     var currentSceneName = "Unknown";
     var battleCtrl = null;
@@ -85,7 +91,32 @@ if (!il2cppBase) {
                                 surrenderAction(battleCtrl, -1);
                                 actionResult = { action: 'exit', success: true };
                                 send({ event: 'action_completed', action: 'exit', success: true });
+                            } else if (act === 'start_fight') {
+                                restartFight(currentScene);
+                                actionResult = { action: 'start_fight', success: true, restarted: true };
+                                send({ event: 'action_completed', action: 'start_fight', success: true, restarted: true });
                             }
+                        }
+                    }
+                } else if (currentSceneName === "MapScene") {
+                    inFight = false;
+                    isPaused = false;
+                    battleCtrl = null;
+                    preFight = null;
+
+                    if (pendingAction === 'start_fight') {
+                        pendingAction = null;
+                        try {
+                            var infoBattle = currentScene.add(0xD0).readPointer();
+                            if (!infoBattle.isNull()) {
+                                onFightButtonClick(infoBattle);
+                                actionResult = { action: 'start_fight', success: true };
+                                send({ event: 'action_completed', action: 'start_fight', success: true });
+                            } else {
+                                send({ event: 'action_completed', action: 'start_fight', success: false, error: "InfoBattle pointer is null" });
+                            }
+                        } catch(e) {
+                            send({ event: 'action_completed', action: 'start_fight', success: false, error: e.toString() });
                         }
                     }
                 } else {
@@ -126,6 +157,14 @@ if (!il2cppBase) {
             }
             actionResult = null;
             pendingAction = 'exit';
+            return { success: true, queued: true };
+        },
+        startFight: function() {
+            if (currentSceneName !== "MapScene" && currentSceneName !== "FightScene") {
+                return { success: false, error: "Cannot start fight from scene: " + currentSceneName };
+            }
+            actionResult = null;
+            pendingAction = 'start_fight';
             return { success: true, queued: true };
         },
         getStatus: function() {

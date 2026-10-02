@@ -43,17 +43,23 @@ screenshot:
 
 ## status: Check device connection, installation state, and running process
 status:
-	@$(PYTHON) -c "from scripts.common import is_installed, is_running, find_adb, get_connected_device; adb = find_adb(); dev = get_connected_device(adb); print(f'ADB Device : {dev}'); print(f'Installed  : {is_installed()}'); print(f'Running    : {is_running()}')"
+	@$(PYTHON) -c "from scripts.start_frida_service import find_adb, get_connected_device, is_app_running, DEFAULT_PACKAGE; adb = find_adb(); dev = get_connected_device(adb); run, pid = is_app_running(adb, dev, DEFAULT_PACKAGE) if dev else (False, None); print(f'ADB Device : {dev}'); print(f'App Running: {run} (PID: {pid})')"
+
+## frida: Verify and establish Frida bridge and port forward
+frida:
+	@$(PYTHON) scripts/start_frida_service.py
+
+## frida-watch: Run continuous Frida watchdog daemon
+frida-watch:
+	@$(PYTHON) scripts/start_frida_service.py --watch
 
 ## help: Display this help message
 help:
 	@echo "Shadow Fight 2 Automation Makefile"
 	@echo "=================================="
 	@echo "Targets:"
-	@echo "  make install    - Check installation; install SF2_Modded_v4.apk if missing"
-	@echo "  make boot       - Check installation; boot the game on BlueStacks"
-	@echo "  make all        - Run install check, then boot (default)"
-	@echo "  make reinstall  - Force reinstall the APK"
-	@echo "  make restart    - Force stop and reboot the game"
-	@echo "  make screenshot - Instant sub-second screen capture to artifacts"
-	@echo "  make status     - Check device, installation, and running status"
+	@echo "  make frida       - Verify and establish Frida bridge & port forwarding"
+	@echo "  make frida-watch - Run continuous Frida connection watchdog daemon"
+	@echo "  make screenshot  - Instant sub-second screen capture to artifacts"
+	@echo "  make status      - Check device, installation, and running status"
+
