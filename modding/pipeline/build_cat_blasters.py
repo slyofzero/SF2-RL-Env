@@ -106,15 +106,17 @@ def main():
     parser.add_argument("--output", type=str, default=None, help="Custom output APK filename or path")
     args, _ = parser.parse_known_args()
     rounds = args.rounds
-    output_apk = OUTPUT_APK
-    if os.path.abspath(output_apk) in (
+    output_apk = os.path.abspath(args.output) if args.output else OUTPUT_APK
+    if output_apk in (
         os.path.abspath(PROTECTED_V1_APK),
         os.path.abspath(PROTECTED_V2_APK),
         os.path.abspath(PROTECTED_V3_APK),
         os.path.abspath(PROTECTED_V4_APK),
         os.path.abspath(PROTECTED_V5_APK),
+        os.path.abspath(PROTECTED_V6_APK),
+        os.path.abspath(PROTECTED_V7_APK),
     ):
-        raise ValueError("SF2_Modded_v1 through v5 are protected milestones! Target v6 or higher!")
+        raise ValueError("SF2_Modded_v1 through v7 are protected milestones! Target v8 or higher!")
     print(f"=== Configuring APK with ROUNDS_TO_WIN = {rounds} -> {os.path.basename(output_apk)} ===")
 
     print("=== Step 1: Decompiling original APK if needed ===")
@@ -277,14 +279,38 @@ def main():
         shutil.copy2(dummy_intro_src, intro_dst)
         print("  Replaced intro.mp4 with 0.04s instant-skip dummy video.")
 
-    # 2. Reassemble classes.dex with AssetExtractor if smali source exists
+    # 2. Reassemble classes.dex with AssetExtractor and Frida Gadget startup hook
     baksmali_dir = os.path.join(CACHE_DIR, "baksmali_multidex")
     smali_jar = os.path.join(ROOT_DIR, "modding", "tools", "smali.jar")
+    baksmali_jar = os.path.join(ROOT_DIR, "modding", "tools", "baksmali.jar")
+    smali_src_dir = os.path.join(ROOT_DIR, "modding", "assets", "smali")
+    classes_dex_out = os.path.join(APKTOOL_SRC, "classes.dex")
+
+    # If baksmali_multidex does not exist (e.g. fresh clone or cleared cache), disassemble classes.dex on the fly:
+    if not os.path.exists(baksmali_dir) and os.path.exists(classes_dex_out) and os.path.exists(baksmali_jar):
+        print("  Disassembling classes.dex with baksmali to inject startup hooks...")
+        os.makedirs(baksmali_dir, exist_ok=True)
+        cmd_baksmali = f'java -jar "{baksmali_jar}" d "{classes_dex_out}" -o "{baksmali_dir}"'
+        subprocess.run(cmd_baksmali, shell=True, check=True)
+
+    # Inject tracked AssetExtractor.smali and MultiDexApplication.smali into baksmali tree
+    if os.path.exists(baksmali_dir) and os.path.exists(smali_src_dir):
+        ae_src = os.path.join(smali_src_dir, "AssetExtractor.smali")
+        ae_dst_dir = os.path.join(baksmali_dir, "com", "nekki", "catblasters")
+        os.makedirs(ae_dst_dir, exist_ok=True)
+        if os.path.exists(ae_src):
+            shutil.copy2(ae_src, os.path.join(ae_dst_dir, "AssetExtractor.smali"))
+
+        mda_src = os.path.join(smali_src_dir, "MultiDexApplication.smali")
+        mda_dst_dir = os.path.join(baksmali_dir, "androidx", "multidex")
+        os.makedirs(mda_dst_dir, exist_ok=True)
+        if os.path.exists(mda_src):
+            shutil.copy2(mda_src, os.path.join(mda_dst_dir, "MultiDexApplication.smali"))
+
     if os.path.exists(baksmali_dir) and os.path.exists(smali_jar):
-        classes_dex_out = os.path.join(APKTOOL_SRC, "classes.dex")
         cmd_smali = f'java -jar "{smali_jar}" a "{baksmali_dir}" -o "{classes_dex_out}"'
         subprocess.run(cmd_smali, shell=True, check=True)
-        print("  Reassembled classes.dex with AssetExtractor startup hook.")
+        print("  Reassembled classes.dex with AssetExtractor and Frida Gadget startup hook.")
 
     # 2b. Ensure Frida Gadget and its config are embedded in lib/arm64-v8a
     gadget_so = os.path.join(ROOT_DIR, "modding", "tools", "libfrida-gadget.so")

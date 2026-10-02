@@ -45,7 +45,10 @@ if (!il2cppBase) {
     // 6. Native ObscuredFloat decrypt function (ALBJPLAPOBO - RVA 0x1BC1F2C)
     var decryptNative = new NativeFunction(il2cppBase.add(0x1BC1F2C), 'float', ['pointer']);
 
-    // 7. Universal Master Combat Loop (battleCtrl.FixedUpdate - RVA 0x33F2A54)
+    // 7. Native Vector3 position getter from fighter+0x250 component (RVA 0x342F0CC)
+    var getPosFunc = new NativeFunction(il2cppBase.add(0x342F0CC), 'pointer', ['pointer']);
+
+    // 8. Universal Master Combat Loop (battleCtrl.FixedUpdate - RVA 0x33F2A54)
     var masterTickAddr = il2cppBase.add(0x33F2A54);
 
     var playerPtr = null;
@@ -102,24 +105,19 @@ if (!il2cppBase) {
     }
 
     function resolveQuadrant(quad) {
-        if (quad === -2) {
-            // Relative Forward
-            return isFacingLeft ? 7 : 3;
-        } else if (quad === -3) {
-            // Relative Backward
-            return isFacingLeft ? 3 : 7;
-        } else if (quad === -4) {
-            // Relative Up-Forward (wd)
-            return isFacingLeft ? 8 : 2;
-        } else if (quad === -5) {
-            // Relative Up-Backward (wa)
-            return isFacingLeft ? 2 : 8;
-        } else if (quad === -6) {
-            // Relative Down-Forward (sd / roll fwd)
-            return isFacingLeft ? 6 : 4;
-        } else if (quad === -7) {
-            // Relative Down-Backward (sa / roll back)
-            return isFacingLeft ? 4 : 6;
+        // Absolute Screen-Space (1=Up, 2=Up-Right, 3=Right, 4=Down-Right, 5=Down, 6=Down-Left, 7=Left, 8=Up-Left)
+        if (quad === -2 || quad === 3) {
+            return 3; // Absolute Screen-Right (D)
+        } else if (quad === -3 || quad === 7) {
+            return 7; // Absolute Screen-Left (A)
+        } else if (quad === -4 || quad === 2) {
+            return 2; // Absolute Up-Right (WD)
+        } else if (quad === -5 || quad === 8) {
+            return 8; // Absolute Up-Left (WA)
+        } else if (quad === -6 || quad === 4) {
+            return 4; // Absolute Down-Right (SD)
+        } else if (quad === -7 || quad === 6) {
+            return 6; // Absolute Down-Left (SA)
         }
         return quad;
     }
@@ -133,30 +131,18 @@ if (!il2cppBase) {
                 playerPtr = battleCtrl.add(0xB0).readPointer();
                 if (playerPtr.isNull()) return;
 
-                // 1. Calculate Real-Time Spatial Facing Direction from Ground Positions
+                // 1. Calculate Real-Time Spatial Facing Direction from Native Ground Positions
                 try {
-                    var listPtr = battleCtrl.add(0x38).readPointer();
-                    if (!listPtr.isNull()) {
-                        var items = listPtr.add(0x10).readPointer();
-                        if (!items.isNull()) {
-                            var f1 = items.add(0x20).readPointer();
-                            var f2 = items.add(0x28).readPointer();
-                            var p1_x = 0.0, p2_x = 0.0;
-                            if (!f1.isNull()) {
-                                var c1 = f1.add(0xE0).readPointer();
-                                if (!c1.isNull()) {
-                                    var pos1 = c1.add(0x10).readPointer();
-                                    if (!pos1.isNull()) p1_x = pos1.add(0x10).readFloat();
-                                }
-                            }
-                            if (!f2.isNull()) {
-                                var c2 = f2.add(0xE0).readPointer();
-                                if (!c2.isNull()) {
-                                    var pos2 = c2.add(0x10).readPointer();
-                                    if (!pos2.isNull()) p2_x = pos2.add(0x10).readFloat();
-                                }
-                            }
-                            if (p1_x !== 0.0 || p2_x !== 0.0) {
+                    var opponentPtr = battleCtrl.add(0xB8).readPointer();
+                    if (!opponentPtr.isNull()) {
+                        var pos1 = playerPtr.add(0x250).readPointer();
+                        var pos2 = opponentPtr.add(0x250).readPointer();
+                        if (!pos1.isNull() && !pos2.isNull()) {
+                            var v1 = getPosFunc(pos1);
+                            var v2 = getPosFunc(pos2);
+                            if (!v1.isNull() && !v2.isNull()) {
+                                var p1_x = v1.add(0x10).readFloat();
+                                var p2_x = v2.add(0x10).readFloat();
                                 isFacingLeft = (p1_x > p2_x);
                             }
                         }
@@ -305,8 +291,15 @@ if (!il2cppBase) {
             haltMovement();
             return true;
         },
-        triggerDash: function(isFwd) {
-            dashQuad = resolveQuadrant(isFwd ? -2 : -3);
+        triggerDash: function(target) {
+            // Absolute Screen-Space: 3, -2, true = Right (dd); 7, -3, false = Left (aa)
+            if (target === 3 || target === -2 || target === true) {
+                dashQuad = 3; // Dash Right (dd)
+            } else if (target === 7 || target === -3 || target === false) {
+                dashQuad = 7; // Dash Left (aa)
+            } else {
+                dashQuad = resolveQuadrant(target);
+            }
             dashPhase = 1;
             return true;
         },

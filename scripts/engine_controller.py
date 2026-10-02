@@ -117,12 +117,12 @@ class SF2EngineController:
             print(f"[ERROR] Step failed: {e}")
             return False
 
-    def dash(self, is_fwd=True):
+    def dash(self, quad=3):
         if not self.is_connected or not self.script:
             return False
         try:
             self.dash_done_event.clear()
-            self.script.exports_sync.trigger_dash(is_fwd)
+            self.script.exports_sync.trigger_dash(quad)
             self.dash_done_event.wait(timeout=0.9)
             return True
         except Exception as e:
@@ -191,18 +191,18 @@ def print_help():
  Basic Movements:
    w                       - Jump Up
    s                       - Duck / Crouch
-   a                       - Step Backward
-   d                       - Step Forward
+   a                       - Step Left
+   d                       - Step Right
 
  Compound Movements:
-   wd                      - Jump Forward (Up + Forward)
-   wa                      - Jump Backward (Up + Backward)
-   sd                      - Roll Forward (Down + Forward)
-   sa                      - Roll Backward (Down + Backward)
+   wd                      - Jump Right (Up + Right)
+   wa                      - Jump Left (Up + Left)
+   sd                      - Roll Right (Down + Right)
+   sa                      - Roll Left (Down + Left)
 
  Fast Movements:
-   dd                      - Forward Dash / Hop
-   aa                      - Backward Dash / Backflip
+   dd                      - Dash Right
+   aa                      - Dash Left
 
  Basic Attacks:
    p                       - Single Neutral Punch / Knife Slash
@@ -211,32 +211,32 @@ def print_help():
    kk                      - Double Kick Combo
 
  Compound Attacks: (w/a/s/d + p/k)
-   dp                      - Forward Knife Slash
-   ap                      - Spinning Back Slash
+   dp                      - Right Knife Slash
+   ap                      - Left Knife Slash
    sp                      - Low Knife Slash
    wp                      - Upward Rising Slash
 
-   dk                      - Forward Step Kick
-   ak                      - Spinning High Back Kick
+   dk                      - Right Step Kick
+   ak                      - Left High Kick
    sk                      - Low Sweep Kick
    wk                      - Flying Jump Kick
 
  Double Attacks:
-   dpp                     - Forward Double Slash (Super Slash!)
-   app                     - Back Double Slash
+   dpp                     - Right Double Slash (Super Slash!)
+   app                     - Left Double Slash
    spp                     - Low Double Slash
    wpp                     - Upward Double Slash
 
-   dkk                     - Forward Double Kick
-   akk                     - Back Double Kick
+   dkk                     - Right Double Kick
+   akk                     - Left Double Kick
    skk                     - Low Double Sweep
    wkk                     - Flying Double Kick
 
  Diagonal Kicks: (w/s)(d/a) + k
-   wdk                     - Front Jump Kick (Up + Forward)
-   wak                     - Up-Backward Kick (Up + Backward)
-   sdk                     - Down-Forward Kick / Slide
-   sak                     - Down-Backward Dodge Kick
+   wdk                     - Up-Right Jump Kick
+   wak                     - Up-Left Jump Kick
+   sdk                     - Down-Right Slide Kick
+   sak                     - Down-Left Dodge Kick
 
  Continuous & Speed:
    hold d / hold a         - Continuous walk
@@ -299,40 +299,40 @@ def repl():
 
             # Continuous Hold
             if user_input in ["hold right", "hold d"] or compact == "holdd":
-                controller.hold(-2)
-                print(" -> Holding FORWARD (continuous walk). Type 'stop' to halt.")
+                controller.hold(3)
+                print(" -> Holding RIGHT (continuous walk). Type 'stop' to halt.")
                 continue
             elif user_input in ["hold left", "hold a"] or compact == "holda":
-                controller.hold(-3)
-                print(" -> Holding BACKWARD (continuous walk). Type 'stop' to halt.")
+                controller.hold(7)
+                print(" -> Holding LEFT (continuous walk). Type 'stop' to halt.")
                 continue
 
-            # 1. Fast Movements (dd = Dash, aa = Backflip)
-            if compact in ["dd", "fwd_dash", "dash"]:
-                controller.dash(is_fwd=True)
-                print(" -> Fast Movement: FORWARD DASH / HOP (dd)")
+            # 1. Fast Movements (dd = Dash Right, aa = Dash Left)
+            if compact in ["dd", "dash_right", "dash"]:
+                controller.dash(3)
+                print(" -> Fast Movement: DASH RIGHT (dd)")
                 continue
-            elif compact in ["aa", "back_dash", "backflip"]:
-                controller.dash(is_fwd=False)
-                print(" -> Fast Movement: BACKWARD DASH / BACKFLIP (aa)")
+            elif compact in ["aa", "dash_left", "backflip"]:
+                controller.dash(7)
+                print(" -> Fast Movement: DASH LEFT (aa)")
                 continue
 
             # 2. Compound Movements (wa, wd, sa, sd)
-            if compact in ["wd", "dw", "jf", "jump_fwd", "jumpforward"]:
-                controller.step(-4, ticks=18)
-                print(" -> Compound Movement: JUMP FORWARD (wd)")
+            if compact in ["wd", "dw", "jump_right"]:
+                controller.step(2, ticks=18)
+                print(" -> Compound Movement: JUMP RIGHT (wd)")
                 continue
-            elif compact in ["wa", "aw", "jb", "jump_back", "jumpbackward"]:
-                controller.step(-5, ticks=18)
-                print(" -> Compound Movement: JUMP BACKWARD (wa)")
+            elif compact in ["wa", "aw", "jump_left"]:
+                controller.step(8, ticks=18)
+                print(" -> Compound Movement: JUMP LEFT (wa)")
                 continue
-            elif compact in ["sd", "ds", "rf", "roll_fwd", "rollforward"]:
-                controller.step(-6, ticks=22)
-                print(" -> Compound Movement: ROLL FORWARD (sd)")
+            elif compact in ["sd", "ds", "roll_right"]:
+                controller.step(4, ticks=22)
+                print(" -> Compound Movement: ROLL RIGHT (sd)")
                 continue
-            elif compact in ["sa", "as", "rb", "roll_back", "rollbackward"]:
-                controller.step(-7, ticks=22)
-                print(" -> Compound Movement: ROLL BACKWARD (sa)")
+            elif compact in ["sa", "as", "roll_left"]:
+                controller.step(6, ticks=22)
+                print(" -> Compound Movement: ROLL LEFT (sa)")
                 continue
 
             # 3. Basic Movements (w, a, s, d)
@@ -344,23 +344,23 @@ def repl():
                 controller.step(5, ticks=16)
                 print(" -> Basic Movement: DUCK / CROUCH (s)")
                 continue
-            elif compact in ["a", "left", "back"]:
-                controller.step(-3, ticks=18)
-                print(" -> Basic Movement: STEP BACKWARD (a)")
+            elif compact in ["a", "left"]:
+                controller.step(7, ticks=18)
+                print(" -> Basic Movement: STEP LEFT (a)")
                 continue
-            elif compact in ["d", "right", "fwd", "forward"]:
-                controller.step(-2, ticks=18)
-                print(" -> Basic Movement: STEP FORWARD (d)")
+            elif compact in ["d", "right"]:
+                controller.step(3, ticks=18)
+                print(" -> Basic Movement: STEP RIGHT (d)")
                 continue
 
             # 4. Double Attacks (dpp, app, skk, wkk, etc.)
-            if compact in ["dpp", "fwdpp", "superslash", "super_slash"]:
-                controller.attack(9, quad=-2, hits=2)
-                print(" -> Double Attack: FORWARD DOUBLE SLASH / SUPER SLASH (dpp)")
+            if compact in ["dpp", "rightpp", "superslash", "super_slash"]:
+                controller.attack(9, quad=3, hits=2)
+                print(" -> Double Attack: RIGHT DOUBLE SLASH (dpp)")
                 continue
-            elif compact in ["app", "backpp"]:
-                controller.attack(9, quad=-3, hits=2)
-                print(" -> Double Attack: BACK DOUBLE SLASH (app)")
+            elif compact in ["app", "leftpp"]:
+                controller.attack(9, quad=7, hits=2)
+                print(" -> Double Attack: LEFT DOUBLE SLASH (app)")
                 continue
             elif compact in ["spp", "lowpp", "downpp"]:
                 controller.attack(9, quad=5, hits=2)
@@ -371,13 +371,13 @@ def repl():
                 print(" -> Double Attack: UPWARD DOUBLE SLASH (wpp)")
                 continue
 
-            elif compact in ["dkk", "fwdkk"]:
-                controller.attack(10, quad=-2, hits=2)
-                print(" -> Double Attack: FORWARD DOUBLE KICK (dkk)")
+            elif compact in ["dkk", "rightkk"]:
+                controller.attack(10, quad=3, hits=2)
+                print(" -> Double Attack: RIGHT DOUBLE KICK (dkk)")
                 continue
-            elif compact in ["akk", "backkk"]:
-                controller.attack(10, quad=-3, hits=2)
-                print(" -> Double Attack: BACK DOUBLE KICK (akk)")
+            elif compact in ["akk", "leftkk"]:
+                controller.attack(10, quad=7, hits=2)
+                print(" -> Double Attack: LEFT DOUBLE KICK (akk)")
                 continue
             elif compact in ["skk", "lowkk", "downkk", "doublesweep"]:
                 controller.attack(10, quad=5, hits=2)
@@ -389,13 +389,13 @@ def repl():
                 continue
 
             # 5. Compound Attacks (wp, ap, sp, dp, wk, ak, sk, dk)
-            if compact in ["dp", "fwdp", "fwd_punch", "forwardpunch"]:
-                controller.attack(9, quad=-2, hits=1)
-                print(" -> Compound Attack: FORWARD KNIFE SLASH (dp)")
+            if compact in ["dp", "rightp", "right_punch"]:
+                controller.attack(9, quad=3, hits=1)
+                print(" -> Compound Attack: RIGHT KNIFE SLASH (dp)")
                 continue
-            elif compact in ["ap", "backp", "back_punch", "backpunch"]:
-                controller.attack(9, quad=-3, hits=1)
-                print(" -> Compound Attack: SPINNING BACK SLASH (ap)")
+            elif compact in ["ap", "leftp", "left_punch"]:
+                controller.attack(9, quad=7, hits=1)
+                print(" -> Compound Attack: LEFT KNIFE SLASH (ap)")
                 continue
             elif compact in ["sp", "downp", "lowpunch", "lowp"]:
                 controller.attack(9, quad=5, hits=1)
@@ -406,13 +406,13 @@ def repl():
                 print(" -> Compound Attack: UPWARD RISING SLASH (wp)")
                 continue
 
-            elif compact in ["dk", "fwdk", "fwd_kick", "forwardkick"]:
-                controller.attack(10, quad=-2, hits=1)
-                print(" -> Compound Attack: FORWARD STEP KICK (dk)")
+            elif compact in ["dk", "rightk", "right_kick"]:
+                controller.attack(10, quad=3, hits=1)
+                print(" -> Compound Attack: RIGHT STEP KICK (dk)")
                 continue
-            elif compact in ["ak", "backk", "back_kick", "backkick"]:
-                controller.attack(10, quad=-3, hits=1)
-                print(" -> Compound Attack: SPINNING HIGH BACK KICK (ak)")
+            elif compact in ["ak", "leftk", "left_kick"]:
+                controller.attack(10, quad=7, hits=1)
+                print(" -> Compound Attack: LEFT HIGH KICK (ak)")
                 continue
             elif compact in ["sk", "downk", "lowkick", "lowk", "sweep"]:
                 controller.attack(10, quad=5, hits=1)
@@ -423,22 +423,22 @@ def repl():
                 print(" -> Compound Attack: FLYING JUMP KICK (wk)")
                 continue
 
-            # 5b. Diagonal Kicks: (w/s)(d/a)k — Up-Forward, Up-Backward, Down-Forward, Down-Backward
-            elif compact in ["wdk", "upfwdk", "frontjumpkick"]:
-                controller.attack(10, quad=-4, hits=1)
-                print(" -> Diagonal Kick: FRONT JUMP KICK (wdk)")
+            # 5b. Diagonal Kicks: (w/s)(d/a)k — Up-Right, Up-Left, Down-Right, Down-Left
+            elif compact in ["wdk", "uprightk", "frontjumpkick"]:
+                controller.attack(10, quad=2, hits=1)
+                print(" -> Diagonal Kick: UP-RIGHT JUMP KICK (wdk)")
                 continue
-            elif compact in ["wak", "upbackk", "upbackkick"]:
-                controller.attack(10, quad=-5, hits=1)
-                print(" -> Diagonal Kick: UP-BACKWARD KICK (wak)")
+            elif compact in ["wak", "upleftk"]:
+                controller.attack(10, quad=8, hits=1)
+                print(" -> Diagonal Kick: UP-LEFT JUMP KICK (wak)")
                 continue
-            elif compact in ["sdk", "downfwdk", "slidekick"]:
-                controller.attack(10, quad=-6, hits=1)
-                print(" -> Diagonal Kick: DOWN-FORWARD KICK / SLIDE (sdk)")
+            elif compact in ["sdk", "downrightk", "slidekick"]:
+                controller.attack(10, quad=4, hits=1)
+                print(" -> Diagonal Kick: DOWN-RIGHT SLIDE KICK (sdk)")
                 continue
-            elif compact in ["sak", "downbackk", "dodgekick"]:
-                controller.attack(10, quad=-7, hits=1)
-                print(" -> Diagonal Kick: DOWN-BACKWARD DODGE KICK (sak)")
+            elif compact in ["sak", "downleftk", "dodgekick"]:
+                controller.attack(10, quad=6, hits=1)
+                print(" -> Diagonal Kick: DOWN-LEFT DODGE KICK (sak)")
                 continue
 
 
