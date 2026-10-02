@@ -140,3 +140,154 @@ Developers can modify `ROUNDS_TO_WIN = N` in the script or pass `--rounds <N>` t
   2. Run `Il2CppDumper.exe` to generate a new `dump.cs`.
   3. Search `dump.cs` for the method signatures (e.g. `bool MCFHOHANNDH()`, `bool AMELFFLEPNF()`, `ShowGDPR`).
   4. Copy the new file offsets from `dump.cs` into `so_patches` in `build_cat_blasters.py`.
+
+---
+
+## 5. Runtime Memory Patching via Frida (vs. Static APK Patching)
+
+There are two fundamentally different ways to modify IL2CPP instruction bytes. Understanding which approach to use — and why the addresses differ between them — is critical.
+
+---
+
+### A. The Two Patching Approaches
+
+| | Static (APK Build-Time) | Runtime (Frida / Live Session) |
+|---|---|---|
+| **How** | `build_cat_blasters.py` writes patch bytes directly into the `.so` file inside the APK, then rebuilds and re-signs | `Memory.patchCode()` via the embedded Frida Gadget modifies the running process's memory pages |
+| **Persistence** | Permanent — baked into the APK until the app is reinstalled | Ephemeral — lives only for the duration of the current process session |
+| **APK rebuild needed?** | ✅ Yes — full `apktool` decode → patch → rebuild → sign cycle | ❌ No — zero APK changes; inject JavaScript at runtime |
+| **Address space used** | Raw **ELF file offsets** (byte position within the `.so` file on disk) | **Virtual memory addresses** (position in the process's mapped address space) |
+
+---
+
+### B. The ELF Load Bias Problem
+
+> [!IMPORTANT]
+> This is the most critical subtlety when moving from static patching to Frida runtime patching: **file offsets and virtual memory addresses are NOT the same**.
+
+When Android loads `libil2cpp.so`, the dynamic linker maps each ELF `PT_LOAD` segment into the process's virtual address space. The executable segment is not necessarily mapped at the same byte offset it occupies within the file — there is an alignment-induced delta called the **load bias**.
+
+For `libil2cpp.so` in SF2 v2.46.0:
+
+| ELF Segment Field | Value |
+|---|---|
+| `p_offset` (position within the file) | `0x18B299C` |
+| `p_vaddr` (virtual address mapped to) | `0x18B699C` |
+| **Load bias** = `p_vaddr − p_offset` | **`0x4000`** |
+
+**The rule**:
+
+$$\text{virtual\_RVA} = \text{file\_offset\_RVA} + \texttt{0x4000}$$
+
+Any address copied out of `build_cat_blasters.py` (which uses file offsets) must have `0x4000` added before it can be used with `Memory.patchCode()`.
+
+---
+
+### C. How the Base Address Is Computed in JavaScript
+
+Frida enumerates the process memory ranges to find where `libil2cpp.so` was loaded. However, `range.base` points into the middle of the library's mapping — it is not the start of the segment. The base is back-calculated so that `base.add(file_offset)` resolves correctly:
+
+```javascript
+// Find the libil2cpp.so mapping
+var ranges = Process.enumerateRangesSync({ protection: 'r-x', coalesce: false });
+var il2cppBase;
+for (var i = 0; i < ranges.length; i++) {
+    if (ranges[i].file && ranges[i].file.path.indexOf('libil2cpp.so') !== -1) {
+        // Subtract the known segment start RVA to get the library base anchor
+        il2cppBase = ranges[i].base.sub(0x18b6000);
+        break;
+    }
+}
+
+// To reach an instruction at a given file offset, use:
+//   il2cppBase.add(file_offset)          → correct for static patch offsets
+//   il2cppBase.add(file_offset + 0x4000) → correct for Frida virtual RVAs
+```
+
+> [!NOTE]
+> The `0x18b6000` subtracted here is derived from the known `p_vaddr` of the segment (`0x18B699C` rounded down to the page boundary). This anchors `il2cppBase` such that adding any file offset directly yields the correct virtual address for that instruction.
+
+---
+
+### D. Corrected Round Control Address Table
+
+The three round control sites require a `+0x4000` adjustment when targeting them from Frida:
+
+| File Offset (APK build script) | Virtual RVA (Frida runtime) | Delta | Reg | Instruction |
+|---|---|---|---|---|
+| `0x33E7D80` | `0x33EBD80` | +`0x4000` | `w22` | `mov w22, #N` — victory comparator (`DHKCOFBMIEL`) |
+| `0x33E9444` | `0x33ED444` | +`0x4000` | `w8`  | `mov w8, #N` — stats threshold (`AIFOMGABBBA`) |
+| `0x33EA8E4` | `0x33EE8E4` | +`0x4000` | `w1`  | `mov w1, #N` — `RoundModel` initializer (`LPIEJMLPFBF`) |
+
+---
+
+### E. `Memory.patchCode()` vs. `Memory.protect()` + `writeU32()`
+
+Two patterns exist for writing to executable memory in Frida. Always prefer `Memory.patchCode()`:
+
+| | `Memory.protect()` + `addr.writeU32()` | `Memory.patchCode()` |
+|---|---|---|
+| **SELinux on code pages** | ⚠️ Can be **silently blocked** — Android's SELinux policy often denies `PROT_WRITE` on `r-x` pages; the write may be a no-op with no error thrown | ✅ Frida's dedicated API handles page remapping internally, bypassing SELinux restrictions |
+| **Instruction cache** | ❌ Manual — you must call cache-flush primitives yourself to avoid stale icache entries | ✅ Automatically flushes the CPU instruction cache after patching |
+| **Use case** | Fine for data pages (`rw-`) | **Always use for patching IL2CPP instructions** |
+
+---
+
+### F. Full JavaScript Example — Runtime Round Patching
+
+```javascript
+/**
+ * arm64Movz — encode an ARM64 MOVZ Wd, #imm instruction.
+ * @param {number} reg  - destination register index (0–31)
+ * @param {number} imm  - immediate value (0–65535)
+ * @returns {number}    - 32-bit little-endian instruction word
+ */
+function arm64Movz(reg, imm) {
+    return (0x52800000 | ((imm & 0xFFFF) << 5) | (reg & 0x1F)) >>> 0;
+}
+
+/**
+ * patchRounds — patch all three round-control sites to N rounds.
+ * @param {number} n - number of rounds required to win a match
+ */
+function patchRounds(n) {
+    var patches = [
+        { rva: 0x33EBD80, reg: 22 },  // DHKCOFBMIEL — victory comparator
+        { rva: 0x33ED444, reg: 8  },  // AIFOMGABBBA — stats threshold
+        { rva: 0x33EE8E4, reg: 1  },  // LPIEJMLPFBF — RoundModel init
+    ];
+
+    patches.forEach(function(p) {
+        (function(addr, instr) {
+            Memory.patchCode(addr, 4, function(code) {
+                code.writeU32(instr);
+            });
+            console.log('[patchRounds] ' + addr + ' <- 0x' + instr.toString(16));
+        })(il2cppBase.add(p.rva), arm64Movz(p.reg, n));
+    });
+}
+
+// Example: configure 2-round matches
+patchRounds(2);
+```
+
+---
+
+### G. Verifying the Patch Live
+
+After calling `patchRounds(N)`, confirm the instructions were written correctly using Frida's built-in disassembler:
+
+```javascript
+// Inspect the victory comparator site after patching
+var ins = Instruction.parse(il2cppBase.add(0x33EBD80));
+console.log(ins.mnemonic + ' ' + ins.opStr);
+// Expected output after patchRounds(2): "mov w22, #2"
+
+// Inspect the RoundModel initializer site
+var ins2 = Instruction.parse(il2cppBase.add(0x33EE8E4));
+console.log(ins2.mnemonic + ' ' + ins2.opStr);
+// Expected output after patchRounds(2): "mov w1, #2"
+```
+
+> [!TIP]
+> If `Instruction.parse` reports the old instruction after patching, the write was silently blocked (likely SELinux on a `protect+write` attempt). Switch to `Memory.patchCode()` if you haven't already, and confirm Frida Gadget is loaded from a writable path rather than a read-only APK asset.

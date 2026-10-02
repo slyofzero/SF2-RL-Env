@@ -687,3 +687,294 @@ actions.disconnect()
 ```
 
 
+
+---
+
+## 16. Unified RL Environment (`ShadowFightEnv`)
+
+The class in [`rl_env/shadow_fight_env.py`](file:///c:/Users/Ishan/Personal/Porfolio/Shadow%20Fight%202/rl_env/shadow_fight_env.py) is the single high-level entry point for RL training loops.
+
+### 16.1 Architecture
+
+`ShadowFightEnv` is a thin orchestration layer that wraps two lower-level Frida connections:
+
+| Component | JS Hook | Responsibility |
+|---|---|---|
+| `SF2GameActions` | `game_actions.js` | Fight lifecycle: start, pause, resume, exit, set_rounds |
+| `SF2TickController` | `tick_controller.js` | Deterministic physics: freeze/unfreeze, step, speed, state |
+
+Both connect **independently** to the same Frida Gadget on port `27042`, each loading its respective JS hook script. This separation keeps the real-time physics control path isolated from the game-state management path, preventing message queue contention.
+
+```
+ShadowFightEnv
+├── SF2GameActions  ──►  game_actions.js  ──►  Unity main thread queue
+└── SF2TickController ──►  tick_controller.js  ──►  FightScene.FixedUpdate hook
+```
+
+### 16.2 Complete Method Reference
+
+| Method | Signature | Description | Returns |
+|---|---|---|---|
+| `connect` | `connect()` | Explicit connect to both subsystems. Auto-called by all methods if not already connected. | `None` |
+| `start` | `start(timeout=20.0)` | Arms auto-freeze, calls `start_fight()`, waits for round-start freeze event, disarms auto-freeze, steps 1 tick to produce first observation. | `TELEMETRY_FRAME dict` |
+| `step` | `step(steps=None, action=None)` | Advance N physics ticks with an optional combat action dispatched on tick 0. | `TELEMETRY_FRAME dict` |
+| `freeze` | `freeze()` | Halt physics tick immediately. | `bool` |
+| `unfreeze` | `unfreeze()` | Resume continuous physics tick. | `bool` |
+| `tick_speed` | `tick_speed(speed=None)` | Set (or get if `speed=None`) the simulation speed multiplier. `1.0` = realtime, `10.0` = 10× faster. | `float` |
+| `pause` | `pause()` | Invoke native in-engine pause modal (queued to Unity main thread). | `None` |
+| `resume` | `resume()` | Dismiss native pause modal (queued to Unity main thread). | `None` |
+| `exit` | `exit()` | Native surrender + `MapScene` transition. Unfreezes physics first so the defeat animation plays through correctly. | `None` |
+| `set_rounds` | `set_rounds(n)` | Runtime memory patch for rounds-to-win (valid range: 1–99). No APK rebuild required. | `None` |
+| `get_rounds` | `get_rounds()` | Query the current patched rounds-to-win value for this session. | `int` |
+| `get_state` | `get_state()` | Query the latest telemetry state without advancing the physics tick. | `TELEMETRY_FRAME dict` |
+| `close` | `close()` | Detach both subsystems, restore simulation speed to `1.0×`. | `None` |
+
+### 16.3 Telemetry State Dict
+
+Every `step()`, `get_state()`, and `start()` call returns a `TELEMETRY_FRAME` dict with the following fields:
+
+```json
+{
+  "type": "TELEMETRY_FRAME",
+  "tick": 1042,
+  "time_left": 87.3,
+  "frozen": true,
+  "speed": 1.0,
+  "in_fight": true,
+  "player": {
+    "hp": 0.84,
+    "x": -1.23,
+    "y": 0.0,
+    "z": 0.0,
+    "facing_left": false,
+    "action": "KnivesStartStanceIdle"
+  },
+  "opponent": {
+    "hp": 1.0,
+    "x": 1.45,
+    "y": 0.0,
+    "z": 0.0,
+    "facing_left": true,
+    "action": "ForwardRoll"
+  },
+  "distance": 268.5,
+  "hits": {
+    "head_hit": false,
+    "critical_hit": false,
+    "shock": false,
+    "blocked_hit": false
+  },
+  "damage_delta": {
+    "player": 0.0,
+    "opponent": 0.0
+  }
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `tick` | `int` | Cumulative physics tick counter since fight start |
+| `time_left` | `float` | Seconds remaining on the round timer |
+| `frozen` | `bool` | Whether physics is currently halted |
+| `speed` | `float` | Current simulation speed multiplier |
+| `in_fight` | `bool` | `false` when a round/match has ended |
+| `player.hp` / `opponent.hp` | `float` | Normalized HP in `[0.0, 1.0]` |
+| `player.x/y/z` / `opponent.x/y/z` | `float` | World-space 3D position (Unity units) |
+| `player.facing_left` / `opponent.facing_left` | `bool` | Character facing direction |
+| `player.action` / `opponent.action` | `string` | Current animation state name |
+| `distance` | `float` | Pixel-space horizontal distance between characters |
+| `hits.*` | `bool` | Hit event flags latched since last tick |
+| `damage_delta.player` / `damage_delta.opponent` | `float` | HP lost by each combatant since the previous tick |
+
+### 16.4 Auto-Freeze Design (Critical)
+
+The `start()` method uses a two-step arm/disarm protocol to guarantee the engine freezes at **exactly tick 0** of round 1, without interfering with subsequent rounds:
+
+1. **Arm** — `enable_auto_freeze(True)` is called *before* `start_fight()`. This activates a `Interceptor.attach` hook on `ViewerFight.Play` (RVA `0x35BE050`) in the JS side.
+2. **Round 1 begins** — The engine calls `ViewerFight.Play` once at the start of round 1. The hook fires, sets `isFrozen = true`, and sends an `auto_frozen_on_round_start` message to Python.
+3. **Python unblocks** — `wait_for_auto_freeze()` resolves, and `enable_auto_freeze(False)` is called **immediately**.
+4. **Step 1 tick** — `step(1)` is called to produce the first observation frame.
+
+> [!CAUTION]
+> The disarm (`enable_auto_freeze(False)`) in step 3 is **critical**. If it is omitted, the `ViewerFight.Play` hook remains armed and will fire again at the start of every subsequent round, freezing the engine mid-match and stalling the episode permanently.
+
+### 16.5 Interactive REPL
+
+`run_interactive()` launches a command-line REPL for manual testing and debugging without writing any RL loop code. Start it via:
+
+```bash
+python -m rl_env
+# or
+python -m rl_env --repl
+```
+
+**Full REPL command reference:**
+
+| Command | Maps to | Description |
+|---|---|---|
+| `start` | `env.start()` | Start fight and freeze at tick 0+1 |
+| `step <N>` | `env.step(N)` | Advance N ticks |
+| `step <N> <action>` | `env.step(N, action)` | Advance N ticks with action |
+| `<N>` | `env.step(N)` | Shorthand for `step <N>` |
+| `f` / `freeze` | `env.freeze()` | Freeze physics |
+| `u` / `unfreeze` | `env.unfreeze()` | Resume continuous physics |
+| `speed <N>` | `env.tick_speed(N)` | Set simulation speed multiplier |
+| `pause` | `env.pause()` | Native in-engine pause modal |
+| `resume` | `env.resume()` | Dismiss native pause modal |
+| `exit` | `env.exit()` | Surrender and return to map |
+| `rounds <N>` | `env.set_rounds(N)` | Patch rounds-to-win at runtime |
+| `rounds` | `env.get_rounds()` | Show current patched round count |
+| `state` / `status` | `env.get_state()` | Print full telemetry JSON |
+| `p`, `k`, `wp`, `dpp`, … | `env.step(6, action)` | Combat move shorthand (6 ticks) |
+| `q` / `quit` | exit | Exit REPL and close env |
+
+### 16.6 Example RL Step Loop
+
+```python
+from rl_env import ShadowFightEnv
+
+env = ShadowFightEnv()
+env.set_rounds(1)           # First-to-1 for fast episodes
+env.tick_speed(5.0)         # 5× faster training
+
+state = env.start()         # Arm auto-freeze, start fight, freeze at tick 0
+prev_p2_hp = state['opponent']['hp']
+
+done = False
+while not done:
+    action = policy(state)                    # your RL policy
+    state = env.step(steps=6, action=action)  # 6 ticks per step ≈ 1 action frame
+
+    p1_hp = state['player']['hp']
+    p2_hp = state['opponent']['hp']
+    reward = (prev_p2_hp - p2_hp) - (state.get('damage_delta', {}).get('player', 0.0))
+    done = not state.get('in_fight', True)
+    prev_p2_hp = p2_hp
+
+env.exit()
+env.close()
+```
+
+---
+
+## 17. Dynamic Round Count Patching (`set_rounds`)
+
+### 17.1 Overview
+
+`SF2GameActions.set_rounds(n)` patches **3 IL2CPP instructions** in the running game process at runtime via Frida's `Memory.patchCode()`. No APK rebuild or relaunch is required — the patch takes effect from the next fight start.
+
+This is the cleanest way to control episode length during RL training:
+- `set_rounds(1)` → first-to-1, fastest possible episode resets
+- `set_rounds(3)` → standard SF2 match (default)
+- `set_rounds(99)` → effectively infinite (useful for extended rollouts)
+
+### 17.2 ELF Load Bias Discovery
+
+The original APK build script ([`build_cat_blasters.py`](file:///c:/Users/Ishan/Personal/Porfolio/Shadow%20Fight%202/modding/pipeline/build_cat_blasters.py)) uses raw ELF file offsets. However, Android loads the executable segment with an alignment delta derived from the ELF program header:
+
+```
+p_vaddr  = 0x18B699C
+p_offset = 0x18B299C
+bias     = p_vaddr - p_offset = 0x4000
+```
+
+Therefore:
+
+$$\text{Virtual RVA (runtime)} = \text{File Offset} + \texttt{0x4000}$$
+
+All addresses passed to `Memory.patchCode()` must use the **runtime virtual RVAs**, not the raw file offsets.
+
+### 17.3 Corrected Virtual Memory Addresses
+
+| File Offset | Virtual RVA (runtime) | Register | Instruction | Role |
+|---|---|---|---|---|
+| `0x33E7D80` | **`0x33EBD80`** | `w22` | `mov w22, #N` | Victory comparator in `DHKCOFBMIEL` |
+| `0x33E9444` | **`0x33ED444`** | `w8` | `mov w8, #N` | Match statistics threshold in `AIFOMGABBBA` |
+| `0x33EA8E4` | **`0x33EE8E4`** | `w1` | `mov w1, #N` | RoundModel initialization in `LPIEJMLPFBF` |
+
+All three must be patched atomically to keep the game's internal round-win counters consistent.
+
+### 17.4 ARM64 Encoding
+
+The `arm64Movz(reg, imm)` helper in `game_actions.js` encodes a `MOVZ Wd, #imm` instruction directly:
+
+```
+Opcode = 0x52800000 | ((imm & 0xFFFF) << 5) | (reg & 0x1F)
+```
+
+**Example** — `N=2, reg=22` (w22):
+
+```
+0x52800000 | (2 << 5) | 22  =  0x52800056
+Disassembly: mov w22, #2
+```
+
+The 4-byte little-endian encoding is written to each patched address.
+
+### 17.5 Patch Safety
+
+> [!IMPORTANT]
+> Several safety guarantees are built into the patching design:
+
+- **`Memory.patchCode()` only** — Frida's dedicated code-patching API is used (not the raw `Memory.protect + writeU32` pattern). `Memory.patchCode()` handles Android SELinux W^X page protection internally and is safe to call on executable pages.
+- **Original-byte restoration on reload** — On script reload, the previously patched bytes at the old (incorrect) addresses are restored to their original values before the correct addresses are patched. This prevents memory corruption if the script is reloaded mid-session.
+- **Session bookkeeping** — The `getRounds()` RPC export tracks the last patched value at the JS side, allowing Python to query the current round count without maintaining separate state.
+
+---
+
+## 18. SF2TickController (`tick_controller.py` / `tick_controller.js`)
+
+### 18.1 Frida Hook Architecture
+
+[`tick_controller.js`](file:///c:/Users/Ishan/Personal/Porfolio/Shadow%20Fight%202/scripts/frida/tick_controller.js) hooks `FightScene.FixedUpdate` via `Interceptor.replace` (not `Interceptor.attach`) to gain full call-site control. On every physics tick, the replacement function runs the following decision tree:
+
+```
+FixedUpdate called by Unity engine
+│
+├─ isFrozen AND stepBudget == 0  →  skip origFixedUpdate()   [physics HALTED]
+│
+├─ stepBudget > 0                →  call origFixedUpdate()
+│                                    decrement stepBudget
+│                                    if stepBudget == 0:
+│                                        send "step_done" + readState()  →  Python
+│
+└─ not frozen                    →  call origFixedUpdate()   [continuous play]
+```
+
+The **auto-freeze hook** is a separate `Interceptor.attach` on `ViewerFight.Play` (RVA `0x35BE050`). When armed (`autoFreezeEnabled = true`), it sets `isFrozen = true` and sends `auto_frozen_on_round_start` to Python exactly once at the start of a round.
+
+### 18.2 Python API
+
+[`SF2TickController`](file:///c:/Users/Ishan/Personal/Porfolio/Shadow%20Fight%202/scripts/tick_controller.py) exposes the following methods:
+
+| Method | Description | Returns |
+|---|---|---|
+| `connect()` | Attach to Frida Gadget on port 27042, load and inject `tick_controller.js`. | `None` |
+| `freeze()` | Call `rpc.freeze()` — sets `isFrozen = true` in JS, halts the physics tick. | `bool` |
+| `unfreeze()` | Call `rpc.unfreeze()` — clears `isFrozen`, resumes continuous physics. | `bool` |
+| `step(num_ticks=1, action=None)` | Call `rpc.step(n, quad, btn)`, then block on the `step_done` message event. Returns the telemetry state attached to the `step_done` message. | `TELEMETRY_FRAME dict` |
+| `set_speed(speed)` | Call `rpc.set_speed(speed)` — sets the Unity `Time.timeScale` multiplier. | `float` |
+| `enable_auto_freeze(flag)` | Call `rpc.set_auto_freeze(flag)` — arm or disarm the `ViewerFight.Play` hook. | `None` |
+| `wait_for_auto_freeze(timeout=30.0)` | Block on a `threading.Event` until the `auto_frozen_on_round_start` message is received from JS, or raise `TimeoutError`. | `None` |
+| `get_state()` | Call `rpc.get_state()` synchronously — returns the current telemetry snapshot without advancing the tick. | `TELEMETRY_FRAME dict` |
+| `disconnect()` | Unload the injected script and detach the Frida session. | `None` |
+
+### 18.3 Action Dispatch in `step()`
+
+Before calling `rpc.step(n, quad, btn)`, the `step()` method resolves the human-readable `action` string via the `ACTION_MAP` lookup table into a `(quad, btn)` tuple:
+
+```python
+# Example entries in ACTION_MAP
+ACTION_MAP = {
+    "p":   (0, "punch"),
+    "k":   (0, "kick"),
+    "wp":  (0, "weapon_punch"),
+    "dpp": (2, "punch"),   # down-forward + punch
+    # ... full directional × button matrix
+}
+
+quad, btn = ACTION_MAP[action]
+rpc.step(num_ticks, quad, btn)
+```
+
+The JS hook dispatches the action on **tick 0** of the step budget — the action fires on the very first tick advanced, and the remaining `n-1` ticks let the animation and physics consequences play out. This ensures the action input is registered at the earliest possible moment within the step window.
