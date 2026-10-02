@@ -34,41 +34,77 @@ try:
 except ImportError:
     frida = None
 
-ADB_PATH = r"C:\Program Files\BlueStacks_nxt\HD-Adb.exe"
-GADGET_PORT = 27042
+import os
+import sys
+import time
+import shutil
+import argparse
+import subprocess
+import threading
+from typing import Optional, Dict, Any
+
+try:
+    import frida
+except ImportError:
+    frida = None
+
+def get_frida_endpoint() -> tuple:
+    host = os.environ.get("FRIDA_HOST", "127.0.0.1")
+    port = int(os.environ.get("FRIDA_PORT", "27042"))
+    return host, port
+
+def ensure_frida_port_forward(port: int = 27042):
+    if os.environ.get("FRIDA_DIRECT") == "1":
+        return
+    adb = os.environ.get("ADB_PATH") or os.environ.get("ADB_BIN") or shutil.which("adb")
+    if not adb and sys.platform == "win32":
+        candidates = [
+            r"C:\Program Files\BlueStacks_nxt\HD-Adb.exe",
+            r"C:\Program Files (x86)\BlueStacks_nxt\HD-Adb.exe",
+        ]
+        for c in candidates:
+            if os.path.exists(c):
+                adb = c
+                break
+    if not adb:
+        adb = "adb"
+    serial = os.environ.get("ANDROID_SERIAL") or os.environ.get("ADB_DEVICE")
+    cmd = [adb]
+    if serial:
+        cmd += ["-s", serial]
+    cmd += ["forward", f"tcp:{port}", f"tcp:{port}"]
+    try:
+        subprocess.run(cmd, capture_output=True, timeout=5)
+    except Exception:
+        pass
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 HOOK_JS_PATH = os.path.join(SCRIPT_DIR, "frida", "game_actions.js")
 
 
 class SF2GameActions:
-    """Native controller for Shadow Fight 2 in-fight actions."""
+    """
+    Native controller for Shadow Fight 2 in-fight actions.
+    Fully emulator-agnostic (supports Docker/Redroid, Waydroid, AVDs, BlueStacks, or bare-metal).
+    """
 
-    def __init__(self, port: int = GADGET_PORT):
-        self.port = port
+    def __init__(self, host: Optional[str] = None, port: Optional[int] = None):
+        default_host, default_port = get_frida_endpoint()
+        self.host = host or default_host
+        self.port = port or default_port
         self.session = None
         self.script = None
         self.is_connected = False
         self._action_event = threading.Event()
         self._last_event = None
 
-    def _ensure_port_forward(self):
-        """Ensures ADB port forwarding to Frida Gadget is active."""
-        if os.path.exists(ADB_PATH):
-            try:
-                subprocess.run(
-                    [ADB_PATH, "forward", f"tcp:{self.port}", f"tcp:{self.port}"],
-                    capture_output=True,
-                    timeout=5,
-                )
-            except Exception:
-                pass
-
     def connect(self) -> bool:
         """Connects to Frida Gadget and loads the actions hook."""
         if frida is None:
             raise RuntimeError("Frida package is not installed. Run: uv pip install frida")
 
-        self._ensure_port_forward()
+        # Auto port-forward if running over ADB (no-op if direct IP / container)
+        ensure_frida_port_forward(self.port)
 
         if not os.path.exists(HOOK_JS_PATH):
             raise FileNotFoundError(f"Frida hook script not found: {HOOK_JS_PATH}")
@@ -78,7 +114,7 @@ class SF2GameActions:
 
         try:
             device_manager = frida.get_device_manager()
-            device = device_manager.add_remote_device(f"127.0.0.1:{self.port}")
+            device = device_manager.add_remote_device(f"{self.host}:{self.port}")
             self.session = device.attach("Gadget")
             self.script = self.session.create_script(js_code)
             self.script.on("message", self._on_message)
@@ -167,10 +203,12 @@ class SF2GameActions:
 def main():
     parser = argparse.ArgumentParser(description="Shadow Fight 2 Native Game Actions Controller")
     parser.add_argument("action", choices=["pause", "resume", "exit", "status"], help="Action to execute")
+    parser.add_argument("--host", type=str, default=None, help="Frida Gadget host (default: from FRIDA_HOST or 127.0.0.1)")
+    parser.add_argument("--port", type=int, default=None, help="Frida Gadget port (default: from FRIDA_PORT or 27042)")
     args = parser.parse_args()
 
-    controller = SF2GameActions()
-    print("[INIT] Connecting to game engine...")
+    controller = SF2GameActions(host=args.host, port=args.port)
+    print(f"[INIT] Connecting to game engine on {controller.host}:{controller.port}...")
     if not controller.connect():
         sys.exit(1)
 

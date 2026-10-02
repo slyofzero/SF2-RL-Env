@@ -13,8 +13,10 @@ import subprocess
 import threading
 import frida
 
-ADB_PATH = r"C:\Program Files\BlueStacks_nxt\HD-Adb.exe"
-GADGET_PORT = 27042
+try:
+    from scripts.common import get_frida_endpoint, ensure_frida_port_forward
+except ImportError:
+    from common import get_frida_endpoint, ensure_frida_port_forward
 
 JS_TELEMETRY_ENGINE = r"""
 'use strict';
@@ -190,12 +192,7 @@ class SF2EngineTelemetry:
         self._ensure_port_forward()
 
     def _ensure_port_forward(self):
-        try:
-            cmd = [ADB_PATH, "forward", f"tcp:{self.port}", f"tcp:{self.port}"]
-            subprocess.run(cmd, check=True, capture_output=True)
-            print(f"[OK] Port forward established: 127.0.0.1:{self.port} -> emulator:{self.port}")
-        except Exception as e:
-            print(f"[WARN] Port forward check: {e}")
+        ensure_frida_port_forward(self.port)
 
     def on_message(self, message, data):
         if message["type"] == "send":

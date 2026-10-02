@@ -17,12 +17,41 @@ Run this interactively in your terminal while in the Dojo or any match:
 import os
 import sys
 import time
+import shutil
 import subprocess
 import threading
 import frida
 
-ADB_PATH = r"C:\Program Files\BlueStacks_nxt\HD-Adb.exe"
-GADGET_PORT = 27042
+def get_frida_endpoint() -> tuple:
+    host = os.environ.get("FRIDA_HOST", "127.0.0.1")
+    port = int(os.environ.get("FRIDA_PORT", "27042"))
+    return host, port
+
+def ensure_frida_port_forward(port: int = 27042):
+    if os.environ.get("FRIDA_DIRECT") == "1":
+        return
+    adb = os.environ.get("ADB_PATH") or os.environ.get("ADB_BIN") or shutil.which("adb")
+    if not adb and sys.platform == "win32":
+        candidates = [
+            r"C:\Program Files\BlueStacks_nxt\HD-Adb.exe",
+            r"C:\Program Files (x86)\BlueStacks_nxt\HD-Adb.exe",
+        ]
+        for c in candidates:
+            if os.path.exists(c):
+                adb = c
+                break
+    if not adb:
+        adb = "adb"
+    serial = os.environ.get("ANDROID_SERIAL") or os.environ.get("ADB_DEVICE")
+    cmd = [adb]
+    if serial:
+        cmd += ["-s", serial]
+    cmd += ["forward", f"tcp:{port}", f"tcp:{port}"]
+    try:
+        subprocess.run(cmd, capture_output=True, timeout=5)
+    except Exception:
+        pass
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 HARNESS_JS_PATH = os.path.join(SCRIPT_DIR, "frida", "engine_harness.js")
 
@@ -31,8 +60,10 @@ def load_harness_script() -> str:
         return f.read()
 
 class SF2EngineController:
-    def __init__(self, port=GADGET_PORT):
-        self.port = port
+    def __init__(self, host=None, port=None):
+        default_host, default_port = get_frida_endpoint()
+        self.host = host or default_host
+        self.port = port or default_port
         self.session = None
         self.script = None
         self.is_connected = False
@@ -41,19 +72,13 @@ class SF2EngineController:
         self.attack_done_event = threading.Event()
 
     def connect(self) -> bool:
-        # Auto-establish ADB port forward (safe to re-run; no-op if already active)
-        try:
-            subprocess.run(
-                [ADB_PATH, "forward", f"tcp:{self.port}", f"tcp:{self.port}"],
-                capture_output=True, timeout=5
-            )
-        except Exception:
-            pass  # If ADB isn't found, let Frida give the real error below
+        # Auto-establish ADB port forward (no-op if direct IP / container)
+        ensure_frida_port_forward(self.port)
 
-        print(f"Connecting to Frida Gadget on 127.0.0.1:{self.port}...")
+        print(f"Connecting to Frida Gadget on {self.host}:{self.port}...")
         try:
             device_manager = frida.get_device_manager()
-            device = device_manager.add_remote_device(f"127.0.0.1:{self.port}")
+            device = device_manager.add_remote_device(f"{self.host}:{self.port}")
             self.session = device.attach("Gadget")
             self.script = self.session.create_script(load_harness_script())
             self.script.on("message", self._on_message)

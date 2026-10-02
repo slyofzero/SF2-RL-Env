@@ -39,20 +39,21 @@ def get_artifact_dir() -> str:
 ARTIFACT_DIR = get_artifact_dir()
 
 def find_adb_binary() -> str:
-    """Finds HD-Adb.exe or adb on the system."""
+    """Finds adb binary in an emulator- and OS-agnostic manner."""
+    env_adb = os.environ.get("ADB_PATH") or os.environ.get("ADB_BIN")
+    if env_adb and os.path.exists(env_adb):
+        return env_adb
+
+    import shutil
+    path_adb = shutil.which("adb")
+    if path_adb:
+        return path_adb
+
     for p in DEFAULT_ADB_PATHS:
         if os.path.exists(p):
             return p
-    # Try which / where
-    try:
-        res = subprocess.run(["where", "adb"], capture_output=True, text=True)
-        if res.returncode == 0:
-            lines = res.stdout.strip().splitlines()
-            if lines:
-                return lines[0].strip()
-    except Exception:
-        pass
-    return DEFAULT_ADB_PATHS[0]
+
+    return "adb"
 
 def is_server_listening(host: str = ADB_HOST, port: int = ADB_PORT) -> bool:
     """Checks if the ADB daemon is already listening on port 5037."""
@@ -143,13 +144,15 @@ def capture_screenshot_bytes(serial: str = None, timeout: float = 5.0) -> tuple[
     ensure_adb_server()
     
     if not serial:
-        devices = get_connected_devices()
-        if DEFAULT_SERIAL in devices:
-            serial = DEFAULT_SERIAL
-        elif devices:
-            serial = devices[0]
+        env_serial = os.environ.get("ANDROID_SERIAL") or os.environ.get("ADB_DEVICE")
+        if env_serial:
+            serial = env_serial
         else:
-            serial = DEFAULT_SERIAL
+            devices = get_connected_devices()
+            if devices:
+                serial = devices[0]
+            else:
+                raise RuntimeError("No active Android device or emulator found on ADB. Ensure an emulator or container is running.")
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.settimeout(timeout)

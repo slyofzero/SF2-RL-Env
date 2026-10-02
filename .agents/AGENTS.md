@@ -56,17 +56,16 @@ Shadow Fight 2/
 │       └── game-content-downloader/   <-- Automated CDN & emulator pack downloader
 ├── Makefile                           <-- Automation Makefile (make install, make boot)
 ├── make.bat                           <-- Windows CMD/PowerShell make wrapper
-├── scripts/                           <-- Lifecycle & ADB automation scripts
-│   ├── common.py                      <-- Shared ADB detection, install & launch logic
-│   ├── install.py                     <-- Checks installation & installs APK if missing
-│   ├── boot.py                        <-- Checks installation & boots game
-│   ├── tap.py                         <-- Interactive ADB touch/tap helper
-│   ├── engine_controller.py           <-- Native IL2CPP action controller (Frida RPC)
-│   ├── test_engine_api.py             <-- Live telemetry streamer (HP, position, hit events)
+├── scripts/                           <-- Core RL & Engine Automation Harness
+│   ├── engine_controller.py           <-- Native IL2CPP action controller (Punches, Kicks, Movement)
+│   ├── game_actions.py                <-- In-engine combat flow controller (Pause, Resume, Exit)
+│   ├── tick_controller.py            <-- Master timing controller (Freeze, Nx Speed, Unfreeze, Step)
 │   ├── stream_telemetry.py            <-- Live JSON telemetry & hit event streamer (NDJSON/Pretty)
 │   └── frida/                         <-- Standalone JavaScript hooks loaded by Python
 │       ├── engine_harness.js          <-- Action controller & physics tick hook
-│       └── telemetry_streamer.js      <-- HP, 3D Vector3 positions, moves & hit badges
+│       ├── game_actions.js            <-- Main-thread scene update queue hook
+│       ├── telemetry_streamer.js      <-- HP, 3D Vector3 positions, moves & hit badges
+│       └── tick_controller.js         <-- Physics tick freeze, speed & step hook
 ├── README.md                          <-- Quick-start overview
 ├── .venv/                             <-- Isolated Python 3.12 environment (uv managed)
 │
@@ -96,7 +95,8 @@ Shadow Fight 2/
     │   ├── 05_OFFLINE_BUNDLES_AND_CDN.md
     │   ├── 06_STARTUP_SMALI_HOOK.md
     │   ├── 07_BUILD_AND_SIGNING_PIPELINE.md
-    │   └── 08_ENGINE_CONTROLLER_AND_RL_HARNESS.md
+    │   ├── 08_ENGINE_CONTROLLER_AND_RL_HARNESS.md
+    │   └── 09_HEADLESS_AND_CONTAINERIZED_RUNTIMES.md
     ├── packages/                      <-- Upstream and repacked packages
     │   ├── Shadow+Fight+2_2.46.0_APKPure.xapk      (Original multi-split XAPK)
     │   └── Shadow_Fight_2_Modded_Cyberpunk.xapk    (Modified multi-split XAPK)
@@ -270,6 +270,10 @@ This log tracks every experiment, tool, and modification attempted in this works
 | **49** | True 60 Hz 1-Tick Telemetry Resolution (`telemetry_streamer.js`, `stream_telemetry.py`) | ✅ Succeeded | Removed the legacy modulo-3 (`tickIndex % 3 === 0`) subsampling constraint in `scripts/frida/telemetry_streamer.js`. Every single physics tick (`FixedUpdate`) is now dispatched over Frida Gadget. Verified live on BlueStacks: `stream_telemetry.py --live` receives contiguous, uninterrupted sequential ticks (`tick: 1, 2, 3, 4, 5, ...`) at 60 Hz with sub-16.6ms intervals, enabling 100% fine-grained RL frame observation without skipping animation transition frames. | Previous implementation subsampled frames every 3 ticks (~20 Hz) to avoid console buffer overflow. Enabling raw 60 Hz streaming delivers 100% frame fidelity directly to the RL harness. |
 | **50** | Simulation Speed Multiplier Analysis & Pre-Round Wall-Clock Decoupling | ✅ Succeeded | Analyzed tick index variance at match start across simulation speeds (`1x` $\approx$ tick 444, `10x` $\approx$ tick 550, `100x` $\approx$ tick 4001). Identified root cause: pre-round intro components (3D asset loading, announcer audio stream via Android OpenSL, and UI tweens via `unscaledDeltaTime`) execute on real-world wall-clock time (~0.8–2.0s). Because `FixedUpdate` executes concurrently at rate $\frac{\Delta t_{\text{real}} \times \text{timeScale}}{\text{fixedDeltaTime}}$, higher multipliers churn thousands of physics ticks before `round_start` fires. Confirmed active combat physics remains 100% deterministic per tick once `round_start` occurs. Documented in Section 14 of `08_ENGINE_CONTROLLER_AND_RL_HARNESS.md`. | Pre-round sequence is not purely physics-driven; gating RL episodes on `round_start` instead of a static tick number guarantees speed-invariant episode synchronization. |
 | **52** | Native In-Engine Game Actions API (`game_actions.js`, `game_actions.py`) | ✅ Succeeded | Reversed combat action handlers in IL2CPP: `FCJBEKHDLAF.OANGGKCBAOJ` (RVA `0x33F3AD8`, handling `ViewerFight.GHOHIFCGFBO` enum: `ButtonPause` 0, `ButtonPauseSurrender` 1, `ButtonPausePlay` 2) and `FCJBEKHDLAF.LPIEJMLPFBF` (RVA `0x33EE838`, handling `JPGAILBOMOF.GAME_OVER_SURRENDER` -1). Hooked universal main-thread loop `Scene<object>.Update` (RVA `0x296FD44`) which runs continuously at 60 Hz even during pause dialogs. Implemented main-thread command queue in `scripts/frida/game_actions.js` and CLI/Python controller in `scripts/game_actions.py`. Verified live on BlueStacks in Stage 1 combat: unpaused game natively (`resume`), re-paused cleanly (`pause`), and exited fight directly back to Act 1 Map (`exit`) with zero ADB / screen taps. | Direct RPC invocations from worker threads crash Unity UI with access violations; queuing actions through `Scene<object>.Update` ensures 100% thread safety and deterministic execution on the main engine thread. |
+| **53** | 100% Emulator-Agnostic & Headless Runtime Decoupling | ✅ Succeeded | Completely decoupled all scripts (`common.py`, `game_actions.py`, `engine_controller.py`, `stream_telemetry.py`, `test_engine_api.py`, `screenshot.py`) from BlueStacks hardcoded paths and serials. Added cross-platform auto-discovery (`shutil.which("adb")`, `ANDROID_SERIAL`, `ADB_PATH`, `FRIDA_HOST`, `FRIDA_PORT`, `FRIDA_DIRECT=1`). Documented cloud and containerized deployment workflows for Docker + ReDroid, Waydroid, and headless Android Studio AVDs in `modding/docs/09_HEADLESS_AND_CONTAINERIZED_RUNTIMES.md`. | Hardcoded `HD-Adb.exe` and `emulator-5554` prevented running on Linux/Docker environments. Standardizing on environment variables and dynamic PATH resolution enables drop-in execution across any Android container or emulator runtime. |
+| **54** | Deterministic In-Engine Tick Stepping & Physics Gate (`tick_step.js`, `tick_step.py`) | ✅ Succeeded | Implemented synchronous frame-by-frame tick stepping via Frida `Interceptor.replace` on `battleCtrl.FixedUpdate` (RVA `0x33F2A54`). In step mode, physics computation, animations, hitboxes, and countdown clock are completely frozen in place. Calling `step(N)` advances the physics engine by precisely $N$ ticks and freezes immediately, returning synchronous state observation. Created `scripts/tick_step.py` supporting interactive step console (Enter = 1 tick, type $N$ for $N$ ticks) and batch stepping (`-n <N>`). Verified live in Tournament combat: game advances by exact requested frame count while remaining frozen between steps with zero UI pause dialogs. | Standard Frida `Interceptor.attach` cannot skip the original C++ routine; `Interceptor.replace` intercepts the native function entry and conditionally executes `origFixedUpdate` only when `ticksBudget > 0`, ensuring 100% deterministic time control. |
+
+
 
 
 

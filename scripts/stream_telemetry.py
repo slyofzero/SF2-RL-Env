@@ -29,8 +29,37 @@ import subprocess
 import threading
 import frida
 
-ADB_PATH = r"C:\Program Files\BlueStacks_nxt\HD-Adb.exe"
-GADGET_PORT = 27042
+def get_frida_endpoint() -> tuple:
+    host = os.environ.get("FRIDA_HOST", "127.0.0.1")
+    port = int(os.environ.get("FRIDA_PORT", "27042"))
+    return host, port
+
+def ensure_frida_port_forward(port: int = 27042):
+    if os.environ.get("FRIDA_DIRECT") == "1":
+        return
+    import shutil
+    adb = os.environ.get("ADB_PATH") or os.environ.get("ADB_BIN") or shutil.which("adb")
+    if not adb and sys.platform == "win32":
+        candidates = [
+            r"C:\Program Files\BlueStacks_nxt\HD-Adb.exe",
+            r"C:\Program Files (x86)\BlueStacks_nxt\HD-Adb.exe",
+        ]
+        for c in candidates:
+            if os.path.exists(c):
+                adb = c
+                break
+    if not adb:
+        adb = "adb"
+    serial = os.environ.get("ANDROID_SERIAL") or os.environ.get("ADB_DEVICE")
+    cmd = [adb]
+    if serial:
+        cmd += ["-s", serial]
+    cmd += ["forward", f"tcp:{port}", f"tcp:{port}"]
+    try:
+        subprocess.run(cmd, capture_output=True, timeout=5)
+    except Exception:
+        pass
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TELEMETRY_JS_PATH = os.path.join(SCRIPT_DIR, "frida", "telemetry_streamer.js")
 
@@ -38,16 +67,8 @@ def load_telemetry_script() -> str:
     with open(TELEMETRY_JS_PATH, "r", encoding="utf-8") as f:
         return f.read()
 
-def ensure_port_forward(port: int = GADGET_PORT):
-    try:
-        subprocess.run(
-            [ADB_PATH, "forward", f"tcp:{port}", f"tcp:{port}"],
-            capture_output=True, timeout=5
-        )
-    except Exception:
-        pass
-
 def main():
+    default_host, default_port = get_frida_endpoint()
     parser = argparse.ArgumentParser(description="Live JSON Telemetry Streamer for Shadow Fight 2.")
     parser.add_argument("--interval", type=float, default=1.0, help="Stream interval in seconds (default: 1.0s). Use 0 for unthrottled live.")
     parser.add_argument("--rate", type=float, default=None, help="Updates per second (Hz). E.g. --rate 1 or --rate 5.")
@@ -55,7 +76,8 @@ def main():
     parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON objects instead of single-line NDJSON")
     parser.add_argument("--hits-only", action="store_true", help="Only stream frames when a hit event occurs")
     parser.add_argument("--log", "--save-log", dest="save_log", nargs="?", const="auto", default=None, help="Store live telemetry in a JSONL file under game-logs/ (auto timestamped if filename omitted)")
-    parser.add_argument("--port", type=int, default=GADGET_PORT, help="Frida Gadget port")
+    parser.add_argument("--host", type=str, default=default_host, help="Frida Gadget host (default: from FRIDA_HOST or 127.0.0.1)")
+    parser.add_argument("--port", type=int, default=default_port, help="Frida Gadget port (default: from FRIDA_PORT or 27042)")
     args = parser.parse_args()
 
     # Determine effective interval
@@ -79,18 +101,18 @@ def main():
         log_file = open(log_path, "a", encoding="utf-8", buffering=1)
         print(f"[*] Live logging active: {log_path}", file=sys.stderr)
 
-    ensure_port_forward(args.port)
+    ensure_frida_port_forward(args.port)
 
-    print(f"Connecting to Frida Gadget on 127.0.0.1:{args.port}...", file=sys.stderr)
+    print(f"Connecting to Frida Gadget on {args.host}:{args.port}...", file=sys.stderr)
     try:
         device_manager = frida.get_device_manager()
-        device = device_manager.add_remote_device(f"127.0.0.1:{args.port}")
+        device = device_manager.add_remote_device(f"{args.host}:{args.port}")
         session = device.attach("Gadget")
     except Exception as e:
         if log_file:
             log_file.close()
         print(f"[ERROR] Could not attach to Frida Gadget: {e}", file=sys.stderr)
-        print("Ensure Shadow Fight 2 (SF2_Modded_v8.apk) is running in BlueStacks.", file=sys.stderr)
+        print("Ensure Shadow Fight 2 (SF2_Modded_v8.apk) is running on the target Android device/container.", file=sys.stderr)
         sys.exit(1)
 
     latest_frame = None
