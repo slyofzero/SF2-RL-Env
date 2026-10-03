@@ -447,92 +447,100 @@ def run_interactive(env: ShadowFightEnv) -> None:
         lower = cmd.lower()
         parts = lower.split()
         first = parts[0]
-        normalized = first[1:] if first.startswith("/") else first
 
-        if normalized in ("q", "quit"):
-            break
-        elif normalized == "start":
-            print("[*] Starting fight, arming auto-freeze, advancing 1 tick...")
-            st = env.start()
-            print(f"[OK] Fight started!\n{format_telemetry_line(st, prefix='     ')}")
-        elif normalized == "pause":
-            ok = env.pause()
-            print(f"[OK] Pause triggered: {ok}")
-        elif normalized == "resume":
-            ok = env.resume()
-            print(f"[OK] Resume triggered: {ok}")
-        elif normalized == "exit":
-            ok = env.exit()
-            print(f"[OK] Exit back to map triggered: {ok}")
-        elif normalized in ("f", "freeze"):
-            env.freeze()
-            print("[OK] Physics is FROZEN in place.")
-        elif normalized in ("u", "unfreeze"):
-            env.unfreeze()
-            print("[OK] Physics is RUNNING continuous 60Hz.")
-        elif normalized == "speed":
-            if len(parts) >= 2:
-                try:
-                    s = env.tick_speed(float(parts[1]))
-                    print(f"[OK] Simulation speed set to {s:.1f}x")
-                except ValueError:
-                    print("[ERROR] Speed must be a number.")
+        if first.startswith("/"):
+            slash_cmd = first[1:]
+            if slash_cmd in ("q", "quit"):
+                break
+            elif slash_cmd == "start":
+                print("[*] Starting fight, arming auto-freeze, advancing 1 tick...")
+                st = env.start()
+                print(f"[OK] Fight started!\n{format_telemetry_line(st, prefix='     ')}")
+            elif slash_cmd == "pause":
+                ok = env.pause()
+                print(f"[OK] Pause triggered: {ok}")
+            elif slash_cmd == "resume":
+                ok = env.resume()
+                print(f"[OK] Resume triggered: {ok}")
+            elif slash_cmd == "exit":
+                ok = env.exit()
+                print(f"[OK] Exit back to map triggered: {ok}")
+            elif slash_cmd in ("f", "freeze"):
+                env.freeze()
+                print("[OK] Physics is FROZEN in place.")
+            elif slash_cmd in ("u", "unfreeze"):
+                env.unfreeze()
+                print("[OK] Physics is RUNNING continuous 60Hz.")
+            elif slash_cmd == "speed":
+                if len(parts) >= 2:
+                    try:
+                        s = env.tick_speed(float(parts[1]))
+                        print(f"[OK] Simulation speed set to {s:.1f}x")
+                    except ValueError:
+                        print("[ERROR] Speed must be a number.")
+                else:
+                    print(f"[OK] Current speed: {env.tick_speed():.1f}x")
+            elif slash_cmd == "step":
+                if len(parts) >= 2 and parts[1].isdigit():
+                    n = int(parts[1])
+                    act = parts[2] if len(parts) >= 3 else None
+                    st = env.step(steps=n, action=act)
+                    prefix = f" -> [+{n} ticks] " if not act else f" -> [+{n} {act.upper()}] "
+                    print(format_telemetry_line(st, prefix=prefix))
+                else:
+                    st = env.step()
+                    print(format_telemetry_line(st, prefix=" -> [+1 tick]   "))
+            elif slash_cmd in ("state", "status"):
+                st = env.get_state()
+                print(json.dumps(st, indent=2))
+            elif slash_cmd in ("meta", "metadata"):
+                print(json.dumps(env.metadata, indent=2))
+            elif slash_cmd == "rounds":
+                if len(parts) >= 2 and parts[1].isdigit():
+                    r = env.set_rounds(int(parts[1]))
+                    print(f"[OK] Rounds to win set to {r} (takes effect on next fight start)")
+                else:
+                    cur = env.get_rounds()
+                    print(f"[OK] Current rounds-to-win: {cur if cur is not None else 'default (unset this session)'}")
+            elif slash_cmd == "act":
+                if len(parts) >= 2:
+                    arg = parts[1]
+                    try:
+                        act_val = int(arg) if arg.isdigit() else arg
+                        st = env.act(act_val)
+                        label = str(arg).upper()
+                        print(format_telemetry_line(st, prefix=f" -> [ACT: {label:4s}] "))
+                    except Exception as e:
+                        print(f"[ERROR] Failed to act: {e}")
+                else:
+                    print("[ERROR] Usage: type the action directly (e.g. p, k, dp) or /act <action>")
             else:
-                print(f"[OK] Current speed: {env.tick_speed():.1f}x")
-        elif normalized == "step":
-            if len(parts) >= 2 and parts[1].isdigit():
-                n = int(parts[1])
-                act = parts[2] if len(parts) >= 3 else None
-                st = env.step(steps=n, action=act)
-                prefix = f" -> [+{n} ticks] " if not act else f" -> [+{n} {act.upper()}] "
-                print(format_telemetry_line(st, prefix=prefix))
-            else:
-                st = env.step()
-                print(format_telemetry_line(st, prefix=" -> [+1 tick]   "))
-        elif normalized.isdigit():
-            n = int(normalized)
-            st = env.step(steps=n)
-            print(format_telemetry_line(st, prefix=f" -> [+{n} ticks] "))
-        elif normalized in ("state", "status"):
-            st = env.get_state()
-            print(json.dumps(st, indent=2))
-        elif normalized in ("meta", "metadata"):
-            print(json.dumps(env.metadata, indent=2))
-        elif normalized == "rounds":
-            if len(parts) >= 2 and parts[1].isdigit():
-                r = env.set_rounds(int(parts[1]))
-                print(f"[OK] Rounds to win set to {r} (takes effect on next fight start)")
-            else:
-                cur = env.get_rounds()
-                print(f"[OK] Current rounds-to-win: {cur if cur is not None else 'default (unset this session)'}")
-        elif normalized == "act":
-            if len(parts) >= 2:
-                arg = parts[1]
-                try:
-                    act_val = int(arg) if arg.isdigit() else arg
-                    st = env.act(act_val)
-                    label = str(arg).upper()
-                    print(format_telemetry_line(st, prefix=f" -> [ACT: {label:4s}] "))
-                except Exception as e:
-                    print(f"[ERROR] Failed to act: {e}")
-            else:
-                print("[ERROR] Usage: type the action directly (e.g. p, k, dp) or /act <action>")
-        elif normalized in ENGINE_ACTION_MAP:
+                print(
+                    f"Unknown command: '{first}'.\n"
+                    f"  Available commands: /start, /pause, /resume, /exit, /speed <n>, /step <number>, /freeze, /unfreeze, /state, /metadata, /q"
+                )
+        elif first in ENGINE_ACTION_MAP:
             # Action typed directly! (e.g. 'p', 'k', 'dp', 'dpp', 'dd', 'aa', or 'p 10')
             if len(parts) >= 2 and parts[1].isdigit():
                 n = int(parts[1])
-                st = env.step(steps=n, action=normalized)
-                label = str(normalized).upper()
+                st = env.step(steps=n, action=first)
+                label = str(first).upper()
                 print(format_telemetry_line(st, prefix=f" -> [{label:4s} +{n} ticks] "))
             else:
-                st = env.act(normalized)
-                label = str(normalized).upper()
+                st = env.act(first)
+                label = str(first).upper()
                 print(format_telemetry_line(st, prefix=f" -> [ACT: {label:4s}] "))
+        elif first in (
+            "start", "pause", "resume", "exit", "speed", "step", "freeze",
+            "unfreeze", "state", "status", "metadata", "meta", "act", "rounds",
+            "quit", "q",
+        ):
+            print(f"[ERROR] Commands must start with '/'. Use '/{first}' instead.")
         else:
             print(
-                f"Unknown command or action: '{cmd}'.\n"
-                f"  Commands: /start, /pause, /resume, /exit, /speed <n>, /step <number>, /freeze, /unfreeze, /state, /q\n"
-                f"  Actions:  p, k, dp, sp, wp, ap, dk, sk, wk, ak, dpp, app, dd, aa, w, s, a, d, stop, etc."
+                f"Unknown action: '{cmd}'.\n"
+                f"  Actions (type directly): p, k, dp, sp, wp, ap, dk, sk, wk, ak, dpp, app, dd, aa, w, s, a, d, stop (or 'action <ticks>', e.g. 'dp 10')\n"
+                f"  Commands (must start with '/'): /start, /pause, /resume, /exit, /speed <n>, /step <n>, /freeze, /unfreeze, /state, /metadata, /q"
             )
 
 

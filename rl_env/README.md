@@ -341,7 +341,7 @@ python -m rl_env
 | `<action> <N>` | Perform action and advance `N` ticks (e.g. `dp 10`, `p 5`). |
 | `/q` / `/quit` | Exit the REPL and detach cleanly. |
 
-*(Note: commands can also be typed without the leading `/`, e.g. `start`, `step 10`, `speed 2`)*
+*(Note: commands strictly require the leading `/` (e.g. `/start`, `/exit`, `/pause`), while bare words are reserved exclusively for direct in-game combat and movement actions like `p`, `k`, `dp`, `dd`, `aa`)*
 
 **Example REPL session:**
 
