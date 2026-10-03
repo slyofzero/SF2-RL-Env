@@ -15,10 +15,10 @@ Actions:
   8: Jump Back
 """
 
-import sys
-import time
-import frida
 import subprocess
+import time
+
+import frida
 
 GADGET_PORT = 27042
 
@@ -87,12 +87,14 @@ if (!il2cppBase) {
 }
 """
 
+
 def main():
     print("Connecting to Frida Gadget on port 27042...")
     device = frida.get_device_manager().add_remote_device(f"127.0.0.1:{GADGET_PORT}")
     session = device.attach("Gadget")
-    
+
     events = []
+
     def on_message(message, data):
         if message["type"] == "send":
             p = message["payload"]
@@ -113,7 +115,14 @@ def main():
     script.exports_sync.send_action(9)
     time.sleep(0.2)
     # Take screenshot of the punch
-    subprocess.run([".venv\\Scripts\\python.exe", ".agents\\skills\\bluestacks-instant-screenshot\\scripts\\screenshot.py", "--artifact", "engine_punch_verify"])
+    subprocess.run(
+        [
+            ".venv\\Scripts\\python.exe",
+            ".agents\\skills\\bluestacks-instant-screenshot\\scripts\\screenshot.py",
+            "--artifact",
+            "engine_punch_verify",
+        ]
+    )
 
     time.sleep(0.6)
 
@@ -121,7 +130,14 @@ def main():
     print("\n--- [TEST 2] Dispatching IN-ENGINE KICK (action=10) ---")
     script.exports_sync.send_action(10)
     time.sleep(0.2)
-    subprocess.run([".venv\\Scripts\\python.exe", ".agents\\skills\\bluestacks-instant-screenshot\\scripts\\screenshot.py", "--artifact", "engine_kick_verify"])
+    subprocess.run(
+        [
+            ".venv\\Scripts\\python.exe",
+            ".agents\\skills\\bluestacks-instant-screenshot\\scripts\\screenshot.py",
+            "--artifact",
+            "engine_kick_verify",
+        ]
+    )
 
     time.sleep(0.6)
 
@@ -129,10 +145,18 @@ def main():
     print("\n--- [TEST 3] Dispatching IN-ENGINE ROLL FORWARD (action=4) ---")
     script.exports_sync.send_action(4)
     time.sleep(0.2)
-    subprocess.run([".venv\\Scripts\\python.exe", ".agents\\skills\\bluestacks-instant-screenshot\\scripts\\screenshot.py", "--artifact", "engine_roll_verify"])
+    subprocess.run(
+        [
+            ".venv\\Scripts\\python.exe",
+            ".agents\\skills\\bluestacks-instant-screenshot\\scripts\\screenshot.py",
+            "--artifact",
+            "engine_roll_verify",
+        ]
+    )
 
     print("\nAll action tests dispatched successfully!")
     session.detach()
+
 
 if __name__ == "__main__":
     main()

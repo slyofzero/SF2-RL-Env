@@ -18,6 +18,7 @@ Usage:
         python scripts/tick_controller.py step 10         # Step exactly 10 ticks
         python scripts/tick_controller.py speed 5         # Set speed to 5x
         python scripts/tick_controller.py auto-freeze     # Wait and auto-freeze the moment fight starts
+        python scripts/tick_controller.py status          # Query simulation timing status
 
     Python API:
         from scripts.tick_controller import SF2TickController
@@ -27,8 +28,8 @@ Usage:
         clock.freeze()
 
         # Step 4 ticks
-        state = clock.step(num_ticks=4)
-        print(f"Clock: {state['time_left']}s | P1 HP: {state['player_hp']}")
+        total_ticks = clock.step(num_ticks=4)
+        print(f"Total Ticks: {total_ticks}")
 
         # Set speed
         clock.set_speed(5.0)
@@ -37,17 +38,18 @@ Usage:
         clock.disconnect()
 """
 
-import os
-import sys
-import time
-import shutil
 import argparse
+import os
+import shutil
 import subprocess
+import sys
 import threading
-from typing import Optional, Dict, Any, Tuple
+import time
+from typing import Any
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass
@@ -57,10 +59,12 @@ try:
 except ImportError:
     frida = None
 
-def get_frida_endpoint() -> Tuple[str, int]:
+
+def get_frida_endpoint() -> tuple[str, int]:
     host = os.environ.get("FRIDA_HOST", "127.0.0.1")
     port = int(os.environ.get("FRIDA_PORT", "27042"))
     return host, port
+
 
 def ensure_frida_port_forward(port: int = 27042):
     if os.environ.get("FRIDA_DIRECT") == "1":
@@ -87,31 +91,32 @@ def ensure_frida_port_forward(port: int = 27042):
     except Exception:
         pass
 
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 HOOK_JS_PATH = os.path.join(SCRIPT_DIR, "frida", "tick_controller.js")
 
-ACTION_MAP: Dict[str, Tuple[int, int]] = {
-    "p": (0, 9),       # Punch
-    "k": (0, 10),      # Kick
-    "w": (1, 0),       # Jump Up
-    "d": (3, 0),       # Forward
-    "s": (5, 0),       # Duck Down
-    "a": (7, 0),       # Back
-    "dp": (3, 9),      # Forward Knife Slash / Punch
-    "sp": (5, 9),      # Low Punch
-    "wp": (1, 9),      # Upper Slash
-    "ap": (7, 9),      # Spinning Back Punch
-    "dk": (3, 10),     # Forward Kick
-    "sk": (5, 10),     # Low Sweep Kick
-    "wk": (1, 10),     # Jumping Kick
-    "ak": (7, 10),     # Backward Crescent Kick
+ACTION_MAP: dict[str, tuple[int, int]] = {
+    "p": (0, 9),  # Punch
+    "k": (0, 10),  # Kick
+    "w": (1, 0),  # Jump Up
+    "d": (3, 0),  # Forward
+    "s": (5, 0),  # Duck Down
+    "a": (7, 0),  # Back
+    "dp": (3, 9),  # Forward Knife Slash / Punch
+    "sp": (5, 9),  # Low Punch
+    "wp": (1, 9),  # Upper Slash
+    "ap": (7, 9),  # Spinning Back Punch
+    "dk": (3, 10),  # Forward Kick
+    "sk": (5, 10),  # Low Sweep Kick
+    "wk": (1, 10),  # Jumping Kick
+    "ak": (7, 10),  # Backward Crescent Kick
 }
 
 
 class SF2TickController:
     """Master controller for Shadow Fight 2 game clock, tick freeze, speed, and stepping."""
 
-    def __init__(self, host: Optional[str] = None, port: Optional[int] = None):
+    def __init__(self, host: str | None = None, port: int | None = None):
         default_host, default_port = get_frida_endpoint()
         self.host = host or default_host
         self.port = port or default_port
@@ -120,7 +125,7 @@ class SF2TickController:
         self.is_connected = False
         self._step_done_event = threading.Event()
         self._auto_freeze_event = threading.Event()
-        self._last_state: Dict[str, Any] = {}
+        self._last_ticks: int = 0
 
     def connect(self) -> bool:
         """Connects to Frida Gadget and loads the tick controller hook."""
@@ -132,11 +137,11 @@ class SF2TickController:
         if not os.path.exists(HOOK_JS_PATH):
             raise FileNotFoundError(f"Hook script not found at {HOOK_JS_PATH}")
 
-        with open(HOOK_JS_PATH, "r", encoding="utf-8") as f:
+        with open(HOOK_JS_PATH, encoding="utf-8") as f:
             js_code = f.read()
 
         try:
-            device_manager = frida.get_device_manager()
+            device_manager = frida.get_device_manager()  # type: ignore[attr-defined]
             device = device_manager.add_remote_device(f"{self.host}:{self.port}")
             self.session = device.attach("Gadget")
             self.script = self.session.create_script(js_code)
@@ -150,16 +155,16 @@ class SF2TickController:
             self.is_connected = False
             return False
 
-    def _on_message(self, message: Dict[str, Any], data: Any):
+    def _on_message(self, message: dict[str, Any], data: Any):
         if message.get("type") == "send":
             payload = message.get("payload", {})
             if isinstance(payload, dict):
                 ev = payload.get("event")
                 if ev == "step_done":
-                    self._last_state = payload.get("state", {})
+                    self._last_ticks = payload.get("total_ticks", 0)
                     self._step_done_event.set()
                 elif ev == "auto_frozen_on_round_start":
-                    self._last_state = payload.get("state", {})
+                    self._last_ticks = payload.get("total_ticks", 0)
                     self._auto_freeze_event.set()
         elif message.get("type") == "error":
             print(f"[JS ERROR] {message.get('stack', message)}", file=sys.stderr)
@@ -178,10 +183,11 @@ class SF2TickController:
         res = self.script.exports_sync.unfreeze()
         return not res.get("frozen", True)
 
-    def step(self, num_ticks: int = 1, action: Optional[str] = None, timeout: float = 5.0) -> Dict[str, Any]:
+    def step(self, num_ticks: int = 1, action: str | None = None, timeout: float = 5.0) -> int:
         """
         Advances the simulation by exactly num_ticks while keeping the game frozen.
         Optionally dispatches a combat action during the step.
+        Returns total ticks executed.
         """
         if not self.is_connected or not self.script:
             raise RuntimeError("Not connected to game engine.")
@@ -197,9 +203,10 @@ class SF2TickController:
 
         done = self._step_done_event.wait(timeout=timeout)
         if not done:
-            self._last_state = self.script.exports_sync.get_state()
+            st = self.get_status()
+            self._last_ticks = st.get("total_ticks", 0)
 
-        return self._last_state
+        return self._last_ticks
 
     def set_speed(self, scale: float = 1.0) -> float:
         """Sets internal simulation speed (1.0 = 1x, 5.0 = 5x, 10.0 = 10x, etc.)."""
@@ -220,11 +227,15 @@ class SF2TickController:
         self.enable_auto_freeze(True)
         return self._auto_freeze_event.wait(timeout=timeout)
 
-    def get_state(self) -> Dict[str, Any]:
-        """Queries the current game state without advancing ticks."""
+    def get_status(self) -> dict[str, Any]:
+        """Queries current simulation timing status (frozen, total_ticks, budget, speed)."""
         if not self.is_connected or not self.script:
             raise RuntimeError("Not connected to game engine.")
-        return self.script.exports_sync.get_state()
+        return self.script.exports_sync.get_status()
+
+    def get_state(self) -> dict[str, Any]:
+        """Compatibility helper returning simulation timing status."""
+        return self.get_status()
 
     def disconnect(self):
         """Restores normal real-time mode, resets speed to 1x, and unhooks."""
@@ -248,13 +259,13 @@ class SF2TickController:
 def run_interactive(controller: SF2TickController):
     """Interactive command console."""
     controller.freeze()
-    st = controller.get_state()
+    status = controller.get_status()
 
     print("\n" + "=" * 70)
     print(" SHADOW FIGHT 2 -- MASTER TICK CONTROLLER")
     print("=" * 70)
     print(" STATUS : [FROZEN]")
-    print(f" STATE  : Clock: {st.get('time_left')}s | Speed: {st.get('speed', 1.0):.1f}x | P1 HP: {st.get('player_hp')*100:.1f}% | P2 HP: {st.get('opponent_hp')*100:.1f}%")
+    print(f" TIMING : Speed: {status.get('speed', 1.0):.1f}x | Total Ticks: {status.get('total_ticks', 0)}")
     print("-" * 70)
     print(" Controls:")
     print("   [Enter]         -> Step exactly 1 tick")
@@ -264,12 +275,12 @@ def run_interactive(controller: SF2TickController):
     print("   freeze          -> Freeze combat physics")
     print("   unfreeze        -> Resume normal continuous physics")
     print("   auto            -> Wait to auto-freeze the moment next round starts")
-    print("   status          -> Query current combat state")
+    print("   status          -> Query current timing status")
     print("   q / quit        -> Reset speed to 1x, unfreeze, and exit")
     print("=" * 70 + "\n")
 
     is_frozen = True
-    current_speed = 1.0
+    current_speed = status.get("speed", 1.0)
 
     while True:
         try:
@@ -281,23 +292,22 @@ def run_interactive(controller: SF2TickController):
         if line in ("q", "quit", "exit"):
             break
         elif line == "":
-            # Step 1 tick
-            st = controller.step(1)
+            ticks = controller.step(1)
             is_frozen = True
-            print(f" -> [+1 tick]   Clock: {st.get('time_left')}s | P1: {st.get('player_hp')*100:5.1f}% | P2: {st.get('opponent_hp')*100:5.1f}%")
+            print(f" -> [+1 tick] Total Ticks: {ticks}")
         elif line.startswith("step "):
             parts = line.split()
             if len(parts) >= 2 and parts[1].isdigit():
                 n = int(parts[1])
                 act = parts[2] if len(parts) >= 3 else None
-                st = controller.step(n, action=act)
+                ticks = controller.step(n, action=act)
                 is_frozen = True
-                print(f" -> [+{n} ticks] Clock: {st.get('time_left')}s | P1: {st.get('player_hp')*100:5.1f}% | P2: {st.get('opponent_hp')*100:5.1f}%")
+                print(f" -> [+{n} ticks] Total Ticks: {ticks}")
         elif line.isdigit():
             n = int(line)
-            st = controller.step(n)
+            ticks = controller.step(n)
             is_frozen = True
-            print(f" -> [+{n} ticks] Clock: {st.get('time_left')}s | P1: {st.get('player_hp')*100:5.1f}% | P2: {st.get('opponent_hp')*100:5.1f}%")
+            print(f" -> [+{n} ticks] Total Ticks: {ticks}")
         elif line.startswith("speed "):
             parts = line.split()
             try:
@@ -312,7 +322,6 @@ def run_interactive(controller: SF2TickController):
             print("[OK] Combat physics is FROZEN.")
         elif line in ("u", "unfreeze", "resume"):
             controller.unfreeze()
-            is_currently_frozen = False
             is_frozen = False
             print(f"[OK] Combat physics is RUNNING (speed {current_speed:.1f}x).")
         elif line == "auto":
@@ -323,12 +332,14 @@ def run_interactive(controller: SF2TickController):
             else:
                 print("[WARN] Timed out waiting for round start.")
         elif line == "status":
-            st = controller.get_state()
-            print(f"[STATUS] In-Fight: {st.get('in_fight')} | Frozen: {st.get('frozen')} | Speed: {st.get('speed')}x | Clock: {st.get('time_left')}s | P1 HP: {st.get('player_hp')*100:.1f}% | P2 HP: {st.get('opponent_hp')*100:.1f}%")
+            st = controller.get_status()
+            print(
+                f"[STATUS] Frozen: {st.get('frozen')} | Speed: {st.get('speed')}x | Total Ticks: {st.get('total_ticks')}"
+            )
         elif line in ACTION_MAP:
-            st = controller.step(6, action=line)
+            ticks = controller.step(6, action=line)
             is_frozen = True
-            print(f" -> [Action: {line.upper()}] Clock: {st.get('time_left')}s | P1: {st.get('player_hp')*100:5.1f}% | P2: {st.get('opponent_hp')*100:5.1f}%")
+            print(f" -> [Action: {line.upper()}] Total Ticks: {ticks}")
         else:
             print("Commands: Enter (1 tick), <N> (N ticks), speed <N>, freeze, unfreeze, auto, status, q (quit)")
 
@@ -356,6 +367,9 @@ def main():
     # auto-freeze
     subparsers.add_parser("auto-freeze", help="Wait for fight/round start and freeze immediately")
 
+    # status
+    subparsers.add_parser("status", help="Query simulation timing status")
+
     # interactive
     subparsers.add_parser("interactive", help="Launch interactive control console")
 
@@ -372,7 +386,6 @@ def main():
         elif args.command == "freeze":
             controller.freeze()
             print("[SUCCESS] Combat physics is now 100% FROZEN in place.")
-            # Keep script alive until Ctrl+C so Frida hook stays active
             try:
                 print("Press Ctrl+C to unfreeze and restore real-time...")
                 while True:
@@ -384,14 +397,19 @@ def main():
             print("[SUCCESS] Real-time 60Hz combat physics resumed.")
         elif args.command == "step":
             controller.freeze()
-            st = controller.step(args.ticks, action=args.action)
-            print(f"[STEP] Advanced {args.ticks} tick(s) -> Clock: {st.get('time_left')}s | P1: {st.get('player_hp')*100:.1f}% | P2: {st.get('opponent_hp')*100:.1f}%")
+            ticks = controller.step(args.ticks, action=args.action)
+            print(f"[STEP] Advanced {args.ticks} tick(s) -> Total Ticks: {ticks}")
             if args.hold:
                 print(f"[*] Holding frozen for {args.hold:.1f}s...")
                 time.sleep(args.hold)
         elif args.command == "speed":
             new_spd = controller.set_speed(args.scale)
             print(f"[SUCCESS] Game simulation speed set to {new_spd:.1f}x.")
+        elif args.command == "status":
+            st = controller.get_status()
+            print(
+                f"[STATUS] Frozen: {st.get('frozen')} | Speed: {st.get('speed')}x | Total Ticks: {st.get('total_ticks')}"
+            )
         elif args.command == "auto-freeze":
             print("[*] Waiting for fight / round to start...")
             if controller.wait_for_auto_freeze(timeout=60.0):

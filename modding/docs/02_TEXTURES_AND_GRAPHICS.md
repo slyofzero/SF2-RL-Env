@@ -54,6 +54,7 @@ The starting arena (**The Dojo**) consists of multi-layered parallax sprites and
 3. In `apply_texture_mod()`, load your PNG and assign it directly to `data.image`:
    ```python
    from PIL import Image
+
    custom_img = Image.open("modding/assets/modified/dojo_bg.png")
    data.image = custom_img
    data.save()

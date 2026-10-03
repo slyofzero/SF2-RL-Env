@@ -39,6 +39,7 @@ import zipfile
 import tempfile
 import subprocess
 
+
 def merge_xapk_to_monolithic(xapk_path: str, output_apk: str, signer_jar: str):
     work_dir = tempfile.mkdtemp(prefix="apk_merge_")
     try:

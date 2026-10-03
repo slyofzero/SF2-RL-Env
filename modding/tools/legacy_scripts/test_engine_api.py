@@ -8,15 +8,17 @@ with sub-millisecond latency.
 """
 
 import sys
-import time
-import subprocess
 import threading
+import time
+
 import frida
 
 try:
-    from scripts.common import get_frida_endpoint, ensure_frida_port_forward
+    from scripts.common import ensure_frida_port_forward, get_frida_endpoint
 except ImportError:
-    from common import get_frida_endpoint, ensure_frida_port_forward
+    from common import ensure_frida_port_forward, get_frida_endpoint
+
+_, GADGET_PORT = get_frida_endpoint()
 
 JS_TELEMETRY_ENGINE = r"""
 'use strict';
@@ -171,6 +173,7 @@ if (!il2cppBase) {
 }
 """
 
+
 class SF2EngineTelemetry:
     def __init__(self, port=GADGET_PORT):
         self.port = port
@@ -251,10 +254,10 @@ class SF2EngineTelemetry:
                 t = self.state["tick"]
                 if t != last_tick and t > 0:
                     last_tick = t
-                    p1_hp_str = f"{self.state['player_hp']*100:>5.1f}%"
-                    p2_hp_str = f"{self.state['opponent_hp']*100:>5.1f}%"
+                    p1_hp_str = f"{self.state['player_hp'] * 100:>5.1f}%"
+                    p2_hp_str = f"{self.state['opponent_hp'] * 100:>5.1f}%"
                     facing = self.state["player_facing"]
-                    dist = f"{self.state['distance']:>6.1f}px" if self.state['distance'] > 0 else "---"
+                    dist = f"{self.state['distance']:>6.1f}px" if self.state["distance"] > 0 else "---"
 
                     hit = ""
                     if time.time() - self.state["hit_time"] < 1.2 and self.state["last_hit"]:
@@ -262,6 +265,7 @@ class SF2EngineTelemetry:
 
                     print(f"{t:<6} | {p1_hp_str:<10} | {facing:<7} | {p2_hp_str:<10} | {dist:<9} | {hit}")
             time.sleep(0.05)
+
 
 def main():
     duration = 30
@@ -277,6 +281,7 @@ def main():
             client.stream(duration=duration)
         except KeyboardInterrupt:
             print("\n[OK] Stream stopped by user.")
+
 
 if __name__ == "__main__":
     main()

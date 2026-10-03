@@ -22,16 +22,16 @@ Usage:
     Or double-click: start_frida.bat
 """
 
+import argparse
 import os
+import shutil
+import subprocess
 import sys
 import time
-import shutil
-import argparse
-import subprocess
-from typing import Optional, Tuple
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass
@@ -75,7 +75,7 @@ def find_adb() -> str:
     return "adb"
 
 
-def get_connected_device(adb: str) -> Optional[str]:
+def get_connected_device(adb: str) -> str | None:
     """Finds an attached online device serial, connecting to 127.0.0.1:5555 if needed."""
     env_serial = os.environ.get("ANDROID_SERIAL") or os.environ.get("ADB_DEVICE")
     if env_serial:
@@ -106,7 +106,7 @@ def get_connected_device(adb: str) -> Optional[str]:
     return None
 
 
-def is_app_running(adb: str, device: str, package: str = DEFAULT_PACKAGE) -> Tuple[bool, Optional[str]]:
+def is_app_running(adb: str, device: str, package: str = DEFAULT_PACKAGE) -> tuple[bool, str | None]:
     """Checks if the game process is running and returns its PID."""
     try:
         cmd = [adb, "-s", device, "shell", f"pidof {package}"]
@@ -114,7 +114,7 @@ def is_app_running(adb: str, device: str, package: str = DEFAULT_PACKAGE) -> Tup
         pid = res.stdout.strip()
         if pid and pid.isdigit():
             return True, pid
-        
+
         # Fallback to ps inspection
         cmd = [adb, "-s", device, "shell", "ps -A"]
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
@@ -149,10 +149,10 @@ def setup_port_forward(adb: str, device: str, port: int = DEFAULT_PORT) -> bool:
 
 
 def test_frida_connection(
-    host: Optional[str] = None,
+    host: str | None = None,
     port: int = DEFAULT_PORT,
     timeout_sec: float = 3.0,
-) -> Tuple[bool, str, Optional[int]]:
+) -> tuple[bool, str, int | None]:
     """Pings Frida on the target host/port and retrieves process / gadget info."""
     if frida is None:
         return False, "frida Python package not installed (run uv pip install frida)", None
@@ -164,7 +164,7 @@ def test_frida_connection(
     last_err = ""
     while time.time() - start_time < timeout_sec:
         try:
-            device_manager = frida.get_device_manager()
+            device_manager = frida.get_device_manager()  # type: ignore[attr-defined]
             remote_dev = device_manager.add_remote_device(f"{host}:{port}")
             procs = remote_dev.enumerate_processes()
             if procs:
@@ -179,7 +179,7 @@ def test_frida_connection(
 
 
 def ensure_frida_bridge(
-    host: Optional[str] = None,
+    host: str | None = None,
     port: int = DEFAULT_PORT,
     auto_boot: bool = True,
     package: str = DEFAULT_PACKAGE,
@@ -215,7 +215,7 @@ def ensure_frida_bridge(
 
     if not device:
         if verbose:
-            print(f"[Frida ERROR] No active Android device found via ADB.", file=sys.stderr)
+            print("[Frida ERROR] No active Android device found via ADB.", file=sys.stderr)
         return False
 
     # 3. Check and optionally boot the game
@@ -259,8 +259,8 @@ def run_check(adb: str, port: int, auto_boot: bool = False) -> bool:
         device = get_connected_device(adb)
 
     if not device:
-        print(f"[ERROR] Could not connect to BlueStacks or Android device.", file=sys.stderr)
-        print(f"        Ensure BlueStacks is open with ADB enabled (Settings -> Advanced -> ADB ON).", file=sys.stderr)
+        print("[ERROR] Could not connect to BlueStacks or Android device.", file=sys.stderr)
+        print("        Ensure BlueStacks is open with ADB enabled (Settings -> Advanced -> ADB ON).", file=sys.stderr)
         return False
 
     print(f"[OK] Android Device  : {device}")
@@ -276,8 +276,8 @@ def run_check(adb: str, port: int, auto_boot: bool = False) -> bool:
             running, pid = is_app_running(adb, device, DEFAULT_PACKAGE)
         else:
             print(f"[WARNING] Game '{DEFAULT_PACKAGE}' is not running.")
-            print(f"          The Frida Gadget runs inside the game engine.")
-            print(f"          Start the game or re-run with --boot to launch automatically.")
+            print("          The Frida Gadget runs inside the game engine.")
+            print("          Start the game or re-run with --boot to launch automatically.")
 
     if running:
         print(f"[OK] Game Running   : {DEFAULT_PACKAGE} (PID: {pid})")
@@ -310,9 +310,11 @@ def run_check(adb: str, port: int, auto_boot: bool = False) -> bool:
         print(f"[FAIL] Could not connect to Frida Gadget on 127.0.0.1:{port}.", file=sys.stderr)
         print(f"       Details: {info}", file=sys.stderr)
         if not running:
-            print(f"       Hint: Launch Shadow Fight 2 on BlueStacks first, then run this again.", file=sys.stderr)
+            print("       Hint: Launch Shadow Fight 2 on BlueStacks first, then run this again.", file=sys.stderr)
         else:
-            print(f"       Hint: If the game just launched, wait 2-3 seconds for Unity to load and retry.", file=sys.stderr)
+            print(
+                "       Hint: If the game just launched, wait 2-3 seconds for Unity to load and retry.", file=sys.stderr
+            )
         print("=" * 65, file=sys.stderr)
         return False
 
@@ -370,7 +372,9 @@ def main():
     parser = argparse.ArgumentParser(description="Shadow Fight 2 Frida Bridge & Service Manager")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"Frida port (default: {DEFAULT_PORT})")
     parser.add_argument("--boot", action="store_true", help="Automatically launch the game if not running")
-    parser.add_argument("--watch", "--daemon", action="store_true", help="Run continuous watchdog daemon to maintain bridge")
+    parser.add_argument(
+        "--watch", "--daemon", action="store_true", help="Run continuous watchdog daemon to maintain bridge"
+    )
     parser.add_argument("--interval", type=float, default=3.0, help="Watchdog poll interval in seconds (default: 3.0)")
     args = parser.parse_args()
 

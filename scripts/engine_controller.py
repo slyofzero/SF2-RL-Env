@@ -15,23 +15,27 @@ Run this interactively in your terminal while in the Dojo or any match:
 """
 
 import os
-import sys
-import time
 import shutil
 import subprocess
+import sys
 import threading
+import time
+
 import frida
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass
+
 
 def get_frida_endpoint() -> tuple:
     host = os.environ.get("FRIDA_HOST", "127.0.0.1")
     port = int(os.environ.get("FRIDA_PORT", "27042"))
     return host, port
+
 
 def ensure_frida_port_forward(port: int = 27042):
     if os.environ.get("FRIDA_DIRECT") == "1":
@@ -58,12 +62,15 @@ def ensure_frida_port_forward(port: int = 27042):
     except Exception:
         pass
 
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 HARNESS_JS_PATH = os.path.join(SCRIPT_DIR, "frida", "engine_harness.js")
 
+
 def load_harness_script() -> str:
-    with open(HARNESS_JS_PATH, "r", encoding="utf-8") as f:
+    with open(HARNESS_JS_PATH, encoding="utf-8") as f:
         return f.read()
+
 
 class SF2EngineController:
     def __init__(self, host=None, port=None):
@@ -83,7 +90,7 @@ class SF2EngineController:
 
         print(f"Connecting to Frida Gadget on {self.host}:{self.port}...")
         try:
-            device_manager = frida.get_device_manager()
+            device_manager = frida.get_device_manager()  # type: ignore[attr-defined]
             device = device_manager.add_remote_device(f"{self.host}:{self.port}")
             self.session = device.attach("Gadget")
             self.script = self.session.create_script(load_harness_script())
@@ -192,6 +199,21 @@ class SF2EngineController:
             return bool(handler(self))
         return False
 
+    def disconnect(self):
+        if self.script:
+            try:
+                self.script.unload()
+            except Exception:
+                pass
+            self.script = None
+        if self.session:
+            try:
+                self.session.detach()
+            except Exception:
+                pass
+            self.session = None
+        self.is_connected = False
+
     def get_status(self):
         if not self.is_connected or not self.script:
             return None
@@ -209,7 +231,6 @@ ENGINE_ACTION_MAP = {
     "k": lambda c: c.attack(10, quad=0, hits=1),
     "kick": lambda c: c.attack(10, quad=0, hits=1),
     "kk": lambda c: c.attack(10, quad=0, hits=2),
-
     # Compound Attacks
     "dp": lambda c: c.attack(9, quad=3, hits=1),
     "rightp": lambda c: c.attack(9, quad=3, hits=1),
@@ -227,7 +248,6 @@ ENGINE_ACTION_MAP = {
     "lowk": lambda c: c.attack(10, quad=5, hits=1),
     "wk": lambda c: c.attack(10, quad=1, hits=1),
     "upk": lambda c: c.attack(10, quad=1, hits=1),
-
     # Double Attacks
     "dpp": lambda c: c.attack(9, quad=3, hits=2),
     "app": lambda c: c.attack(9, quad=7, hits=2),
@@ -237,13 +257,11 @@ ENGINE_ACTION_MAP = {
     "akk": lambda c: c.attack(10, quad=7, hits=2),
     "skk": lambda c: c.attack(10, quad=5, hits=2),
     "wkk": lambda c: c.attack(10, quad=1, hits=2),
-
     # Diagonal Kicks
     "wdk": lambda c: c.attack(10, quad=2, hits=1),
     "wak": lambda c: c.attack(10, quad=8, hits=1),
     "sdk": lambda c: c.attack(10, quad=4, hits=1),
     "sak": lambda c: c.attack(10, quad=6, hits=1),
-
     # Fast Movements (Dashes)
     "dd": lambda c: c.dash(3),
     "dash": lambda c: c.dash(3),
@@ -251,7 +269,6 @@ ENGINE_ACTION_MAP = {
     "aa": lambda c: c.dash(7),
     "dash_left": lambda c: c.dash(7),
     "backflip": lambda c: c.dash(7),
-
     # Compound Movements
     "wd": lambda c: c.step(2, ticks=18),
     "dw": lambda c: c.step(2, ticks=18),
@@ -261,7 +278,6 @@ ENGINE_ACTION_MAP = {
     "ds": lambda c: c.step(4, ticks=22),
     "sa": lambda c: c.step(6, ticks=22),
     "as": lambda c: c.step(6, ticks=22),
-
     # Basic Movements
     "w": lambda c: c.step(1, ticks=14),
     "up": lambda c: c.step(1, ticks=14),
@@ -273,7 +289,6 @@ ENGINE_ACTION_MAP = {
     "left": lambda c: c.step(7, ticks=18),
     "d": lambda c: c.step(3, ticks=18),
     "right": lambda c: c.step(3, ticks=18),
-
     # Continuous & Stop
     "stop": lambda c: c.stop(),
     "noop": lambda c: c.stop(),
@@ -285,15 +300,43 @@ ENGINE_ACTION_MAP = {
 }
 
 ENGINE_ACTION_LIST = [
-    "noop", "p", "k", "w", "s", "a", "d",
-    "dp", "sp", "wp", "ap",
-    "dk", "sk", "wk", "ak",
-    "wd", "wa", "sd", "sa",
-    "dd", "aa",
-    "pp", "kk", "dpp", "spp", "wpp", "app",
-    "dkk", "skk", "wkk", "akk",
-    "wdk", "wak", "sdk", "sak",
+    "noop",
+    "p",
+    "k",
+    "w",
+    "s",
+    "a",
+    "d",
+    "dp",
+    "sp",
+    "wp",
+    "ap",
+    "dk",
+    "sk",
+    "wk",
+    "ak",
+    "wd",
+    "wa",
+    "sd",
+    "sa",
+    "dd",
+    "aa",
+    "pp",
+    "kk",
+    "dpp",
+    "spp",
+    "wpp",
+    "app",
+    "dkk",
+    "skk",
+    "wkk",
+    "akk",
+    "wdk",
+    "wak",
+    "sdk",
+    "sak",
 ]
+
 
 def print_help():
     print("""
@@ -363,6 +406,7 @@ def print_help():
 ============================================================
 """)
 
+
 def repl():
     controller = SF2EngineController()
     if not controller.connect():
@@ -396,8 +440,8 @@ def repl():
             if compact == "status":
                 st = controller.get_status()
                 if st:
-                    p1_hp = f"{st.get('player_hp', 1.0)*100:.1f}%"
-                    facing = "LEFT" if st.get('facing_left') else "RIGHT"
+                    p1_hp = f"{st.get('player_hp', 1.0) * 100:.1f}%"
+                    facing = "LEFT" if st.get("facing_left") else "RIGHT"
                     print(f" -> Status: Engine Active | Shadow HP: {p1_hp} | Facing: {facing}")
                 continue
 
@@ -556,7 +600,6 @@ def repl():
                 print(" -> Diagonal Kick: DOWN-LEFT DODGE KICK (sak)")
                 continue
 
-
             # 6. Basic Attacks & Combos (p, pp, k, kk)
             if compact in ["pp", "doublepunch"]:
                 controller.attack(9, quad=0, hits=2)
@@ -583,6 +626,7 @@ def repl():
             controller.stop()
             print("\nExiting.")
             break
+
 
 if __name__ == "__main__":
     repl()

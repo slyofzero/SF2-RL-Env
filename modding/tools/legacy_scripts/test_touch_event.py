@@ -2,9 +2,9 @@
 """
 Test high-speed raw event injection to /dev/input/event4
 """
-import sys
-import time
+
 import subprocess
+
 from common import find_adb, get_connected_device
 
 adb = find_adb()
@@ -22,11 +22,11 @@ y_ev = 23351
 # 1 330 1 (BTN_TOUCH down)
 # 0 0 0 (SYN_REPORT)
 cmds_down = [
-    f"sendevent /dev/input/event4 3 57 1",
+    "sendevent /dev/input/event4 3 57 1",
     f"sendevent /dev/input/event4 3 53 {x_ev}",
     f"sendevent /dev/input/event4 3 54 {y_ev}",
-    f"sendevent /dev/input/event4 1 330 1",
-    f"sendevent /dev/input/event4 0 0 0"
+    "sendevent /dev/input/event4 1 330 1",
+    "sendevent /dev/input/event4 0 0 0",
 ]
 
 # Touch UP:
@@ -34,12 +34,12 @@ cmds_down = [
 # 1 330 0 (BTN_TOUCH up)
 # 0 0 0 (SYN_REPORT)
 cmds_up = [
-    f"sendevent /dev/input/event4 3 57 -1",
-    f"sendevent /dev/input/event4 1 330 0",
-    f"sendevent /dev/input/event4 0 0 0"
+    "sendevent /dev/input/event4 3 57 -1",
+    "sendevent /dev/input/event4 1 330 0",
+    "sendevent /dev/input/event4 0 0 0",
 ]
 
-cmd_full = " && ".join(cmds_down) + f" && sleep 0.05 && " + " && ".join(cmds_up)
+cmd_full = " && ".join(cmds_down) + " && sleep 0.05 && " + " && ".join(cmds_up)
 print("[*] Executing raw kernel touch event on /dev/input/event4...")
 subprocess.run([adb, "-s", dev, "shell", cmd_full], check=True)
 print("[OK] Kernel touch event dispatched!")

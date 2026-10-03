@@ -1,26 +1,32 @@
-import sys
-sys.stdout.reconfigure(encoding='utf-8')
-import UnityPy
-import xml.etree.ElementTree as ET
 import json
+import sys
+import xml.etree.ElementTree as ET
 
-bundle_path = 'modding/assets/downloaded_gamedata/bundles/VERSIONAL_CONFIGS'
+import UnityPy
+
+sys.stdout.reconfigure(encoding="utf-8")
+
+bundle_path = "modding/assets/downloaded_gamedata/bundles/VERSIONAL_CONFIGS"
 env = UnityPy.load(bundle_path)
 
 eng_text = ""
 for obj in env.objects:
-    if obj.type.name == 'TextAsset':
+    if obj.type.name == "TextAsset":
         data = obj.read()
-        name = getattr(data, 'm_Name', getattr(data, 'name', None))
-        if name == 'eng':
-            raw = bytes(data.m_Script) if isinstance(data.m_Script, (bytes, bytearray)) else str(data.m_Script).encode('utf-8')
-            eng_text = raw.decode('utf-8-sig', errors='ignore')
+        name = getattr(data, "m_Name", getattr(data, "name", None))
+        if name == "eng":
+            raw = (
+                bytes(data.m_Script)
+                if isinstance(data.m_Script, (bytes, bytearray))
+                else str(data.m_Script).encode("utf-8")
+            )
+            eng_text = raw.decode("utf-8-sig", errors="ignore")
 
 root = ET.fromstring(eng_text)
 words = {}
-for word in root.findall('.//Word'):
-    title = word.get('Title', '')
-    text = word.text or ''
+for word in root.findall(".//Word"):
+    title = word.get("Title", "")
+    text = word.text or ""
     words[title] = text
 
 print(f"Total localized strings: {len(words)}")
@@ -34,10 +40,10 @@ acts = {
             ("Brick", words.get("Brick", "Brick")),
             ("Needle", words.get("Needle", "Needle")),
             ("Ghost", words.get("Ghost", "Ghost")),
-            ("Dagger", words.get("Dagger", "Dagger"))
+            ("Dagger", words.get("Dagger", "Dagger")),
         ],
         "Zone": "ZONE_1",
-        "Arena": "ARENA_TOURNAMENT_1"
+        "Arena": "ARENA_TOURNAMENT_1",
     },
     "Act 2 (Secret Path)": {
         "Boss": ("BOSS_HERMIT", words.get("BOSS_HERMIT", "Hermit")),
@@ -46,10 +52,10 @@ acts = {
             ("Buffalo", words.get("Buffalo", "Buffalo")),
             ("Mantis", words.get("Mantis", "Mantis")),
             ("Tiger", words.get("Tiger", "Tiger")),
-            ("Crane", words.get("Crane", "Crane"))
+            ("Crane", words.get("Crane", "Crane")),
         ],
         "Zone": "ZONE_2",
-        "Arena": "ARENA_VILLAGE"
+        "Arena": "ARENA_VILLAGE",
     },
     "Act 3 (Trail of Blood)": {
         "Boss": ("BOSS_BUTCHER", words.get("BOSS_BUTCHER", "Butcher")),
@@ -58,10 +64,10 @@ acts = {
             ("Rhino", words.get("Rhino", "Rhino")),
             ("Bull", words.get("Bull", "Bull")),
             ("Viper", words.get("Viper", "Viper")),
-            ("Raven", words.get("Raven", "Raven"))
+            ("Raven", words.get("Raven", "Raven")),
         ],
         "Zone": "ZONE_3",
-        "Arena": "ARENA_SLAUGHTERHOUSE"
+        "Arena": "ARENA_SLAUGHTERHOUSE",
     },
     "Act 4 (Pirate Throne)": {
         "Boss": ("BOSS_WASP", words.get("BOSS_WASP", "Wasp")),
@@ -70,10 +76,10 @@ acts = {
             ("Cleaver", words.get("Cleaver", "Cleaver")),
             ("Shark", words.get("Shark", "Shark")),
             ("Hawk", words.get("Hawk", "Hawk")),
-            ("Whale", words.get("Whale", "Whale"))
+            ("Whale", words.get("Whale", "Whale")),
         ],
         "Zone": "ZONE_4",
-        "Arena": "ARENA_PIRATE_SHIP"
+        "Arena": "ARENA_PIRATE_SHIP",
     },
     "Act 5 (Great Temptation)": {
         "Boss": ("BOSS_WIDOW", words.get("BOSS_WIDOW", "Widow")),
@@ -82,10 +88,10 @@ acts = {
             ("Fox", words.get("Fox", "Fox")),
             ("Cleo", words.get("Cleo", "Cleo")),
             ("Puma", words.get("Puma", "Puma")),
-            ("Mistress", words.get("Mistress", "Mistress"))
+            ("Mistress", words.get("Mistress", "Mistress")),
         ],
         "Zone": "ZONE_5",
-        "Arena": "ARENA_COURTYARD"
+        "Arena": "ARENA_COURTYARD",
     },
     "Act 6 (Iron Reign)": {
         "Boss": ("BOSS_SHOGUN", words.get("BOSS_SHOGUN", "Shogun")),
@@ -94,10 +100,10 @@ acts = {
             ("Captain", words.get("Captain", "Captain")),
             ("Major", words.get("Major", "Major")),
             ("Colonel", words.get("Colonel", "Colonel")),
-            ("General", words.get("General", "General"))
+            ("General", words.get("General", "General")),
         ],
         "Zone": "ZONE_6",
-        "Arena": "ARENA_SHOGUN_FORTRESS"
+        "Arena": "ARENA_SHOGUN_FORTRESS",
     },
     "Act 7 (Revelation / Titan)": {
         "Boss": ("BOSS_TITAN", words.get("BOSS_TITAN", "Titan")),
@@ -106,11 +112,11 @@ acts = {
             ("Master", words.get("Master", "Master")),
             ("Guru", words.get("Guru", "Guru")),
             ("Emperor", words.get("Emperor", "Emperor")),
-            ("Corsair", words.get("Corsair", "Corsair"))
+            ("Corsair", words.get("Corsair", "Corsair")),
         ],
         "Zone": "ZONE_7",
-        "Arena": "ARENA_TITAN_CORE"
-    }
+        "Arena": "ARENA_TITAN_CORE",
+    },
 }
 
 print(json.dumps(acts, indent=2))

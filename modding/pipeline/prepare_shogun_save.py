@@ -1,14 +1,12 @@
 import hashlib
-import os
 import re
 import subprocess
-import time
 
 LIVE_XML = "modding/build_cache/live_users.xml"
 OUT_XML = "modding/build_cache/shogun_users.xml"
 OUT_HASH = "modding/build_cache/shogun_users.xml.hash"
 
-with open(LIVE_XML, "r", encoding="utf-8") as f:
+with open(LIVE_XML, encoding="utf-8") as f:
     content = f.read()
 
 # 1. Update Zone, Focus and FightIDS
@@ -20,14 +18,13 @@ content = re.sub(r'FightIDS="[^"]*"', 'FightIDS="ZONE_6|BOSS_SAMURAI|6"', conten
 content = re.sub(
     r'<Battle Name="ZONE_6\|BOSS_SAMURAI_LOCKED\|"[^>]*/>',
     '<Battle Name="ZONE_6|BOSS_SAMURAI|" Locked="0" Hidden="0" ReplayCount="0" />',
-    content
+    content,
 )
 
 # If ZONE_6|BOSS_SAMURAI| doesn't exist, add it
 if 'Battle Name="ZONE_6|BOSS_SAMURAI|"' not in content:
     content = content.replace(
-        '<Battles>',
-        '<Battles>\n        <Battle Name="ZONE_6|BOSS_SAMURAI|" Locked="0" Hidden="0" ReplayCount="0" />'
+        "<Battles>", '<Battles>\n        <Battle Name="ZONE_6|BOSS_SAMURAI|" Locked="0" Hidden="0" ReplayCount="0" />'
     )
 
 # 3. Add Shogun and Bodyguards fights
@@ -40,7 +37,7 @@ shogun_fights = """
         <Fight ID="-1" IDS="ZONE_6|BOSS_SAMURAI|6" CompletedCount="0" LossCount="0" EclipseCompletedCount="0" EclipseLossCount="0" StoryCount="0" CompletedTime="0" TimeLeft="0" RandomizeTimeLeft="0" Level="6" />"""
 
 if 'IDS="ZONE_6|BOSS_SAMURAI|6"' not in content:
-    content = re.sub(r'(<Fights>\s*)', r'\1' + shogun_fights + '\n', content)
+    content = re.sub(r"(<Fights>\s*)", r"\1" + shogun_fights + "\n", content)
 
 # 4. Save and calculate MD5
 with open(OUT_XML, "w", encoding="utf-8") as f:

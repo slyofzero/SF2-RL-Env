@@ -203,13 +203,15 @@ if (!il2cppBase) {
     var currentRound = 1;
     var lastBattleCtrl = null;
     var equipmentInfoSent = false;
+    var latestState = null;
+    var latestEquipment = null;
 
     // Round Start: ViewerFight.Play (RVA 0x35BE050)
     Interceptor.attach(il2cppBase.add(0x35BE050), {
         onEnter: function(args) {
             try {
                 send({
-                    type: "ROUND_START",
+                    event: "ROUND_START",
                     round: currentRound,
                     timestamp: Date.now() / 1000.0
                 });
@@ -263,7 +265,7 @@ if (!il2cppBase) {
                 }
 
                 send({
-                    type: "ROUND_END",
+                    event: "ROUND_END",
                     round: currentRound,
                     winner: winner,
                     reason: reason,
@@ -332,6 +334,8 @@ if (!il2cppBase) {
                     currentRound = 1;
                     equipmentInfoSent = false;
                     isGamePaused = false;
+                    latestState = null;
+                    latestEquipment = null;
                 }
 
                 playerPtr = battleCtrl.add(0xB0).readPointer();
@@ -360,9 +364,7 @@ if (!il2cppBase) {
                     var p2R = readItemName(p2Param.add(0xD8).readPointer()) || "NoRanged";
                     var p2M = readItemName(p2Param.add(0xE0).readPointer()) || "NoMagic";
 
-                    send({
-                        type: "EQUIPMENT_INFO",
-                        timestamp: Date.now() / 1000.0,
+                    latestEquipment = {
                         player: {
                             name: cleanFighterName(p1N),
                             weapon: p1W,
@@ -379,6 +381,13 @@ if (!il2cppBase) {
                             ranged: p2R,
                             magic: p2M
                         }
+                    };
+
+                    send({
+                        event: "EQUIPMENT_INFO",
+                        timestamp: Date.now() / 1000.0,
+                        player: latestEquipment.player,
+                        opponent: latestEquipment.opponent
                     });
                     equipmentInfoSent = true;
                 }
@@ -498,31 +507,47 @@ if (!il2cppBase) {
                 var hitsBatch = pendingHits.slice(0);
                 pendingHits = [];
 
-                send({
-                        type: "TELEMETRY_FRAME",
-                        tick: currentTick,
-                        timestamp: Date.now() / 1000.0,
-                        time_left: timeLeft,
-                        player: {
-                            hp: parseFloat(Math.min(1.0, Math.max(0.0, p1_hp)).toFixed(4)),
-                            x: p1_x,
-                            y: p1_y,
-                            z: p1_z,
-                            facing: p1Facing,
-                            action: p1CurrentMove
-                        },
-                        opponent: {
-                            hp: parseFloat(Math.min(1.0, Math.max(0.0, p2_hp)).toFixed(4)),
-                            x: p2_x,
-                            y: p2_y,
-                            z: p2_z,
-                            facing: p2Facing,
-                            action: p2CurrentMove
-                        },
-                        distance: distance,
-                        hits: hitsBatch
-                    });
+                var statePayload = {
+                    event: "STATE",
+                    tick: currentTick,
+                    round: currentRound,
+                    timestamp: Date.now() / 1000.0,
+                    time_left: timeLeft,
+                    player: {
+                        hp: parseFloat(Math.min(1.0, Math.max(0.0, p1_hp)).toFixed(4)),
+                        x: p1_x,
+                        y: p1_y,
+                        z: p1_z,
+                        facing: p1Facing,
+                        action: p1CurrentMove
+                    },
+                    opponent: {
+                        hp: parseFloat(Math.min(1.0, Math.max(0.0, p2_hp)).toFixed(4)),
+                        x: p2_x,
+                        y: p2_y,
+                        z: p2_z,
+                        facing: p2Facing,
+                        action: p2CurrentMove
+                    },
+                    distance: distance,
+                    hits: hitsBatch
+                };
+
+                latestState = statePayload;
+                send(statePayload);
             } catch(e) {}
         }
     });
+
+    rpc.exports = {
+        getState: function() {
+            return latestState;
+        },
+        getEquipment: function() {
+            return latestEquipment;
+        },
+        getRound: function() {
+            return currentRound;
+        }
+    };
 }

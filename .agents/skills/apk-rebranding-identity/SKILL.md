@@ -80,9 +80,10 @@ Using a 512x512 high-resolution source PNG, resize and replace standard launcher
 from PIL import Image
 import os
 
+
 def inject_icons(source_icon_path: str, apktool_root: str):
     icon_src = Image.open(source_icon_path)
-    
+
     icon_densities = {
         "res/mipmap-mdpi": 48,
         "res/mipmap-hdpi": 72,

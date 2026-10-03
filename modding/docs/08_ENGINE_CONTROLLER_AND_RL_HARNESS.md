@@ -368,13 +368,13 @@ The `SF2EngineController` class in `scripts/engine_controller.py` wraps all Frid
 from scripts.engine_controller import SF2EngineController
 
 ctrl = SF2EngineController()
-ctrl.connect()      # Attaches to Gadget on port 27042
+ctrl.connect()  # Attaches to Gadget on port 27042
 
 # Movements
-ctrl.step(quad, ticks)   # Single timed step. quad = absolute or relative code
-ctrl.hold(quad)           # Continuous walk until stop()
-ctrl.dash(is_fwd=True)   # Double-tap dash forward or back
-ctrl.stop()               # Halt all movement immediately
+ctrl.step(quad, ticks)  # Single timed step. quad = absolute or relative code
+ctrl.hold(quad)  # Continuous walk until stop()
+ctrl.dash(is_fwd=True)  # Double-tap dash forward or back
+ctrl.stop()  # Halt all movement immediately
 
 # Attacks
 ctrl.attack(act_id, quad=0, hits=1)
@@ -383,7 +383,7 @@ ctrl.attack(act_id, quad=0, hits=1)
 # hits: 1=single, 2=double combo
 
 # Speed
-ctrl.set_speed(1.0)   # 1.0 = normal, 10.0 = 10× faster
+ctrl.set_speed(1.0)  # 1.0 = normal, 10.0 = 10× faster
 
 # Telemetry
 status = ctrl.get_status()
@@ -834,21 +834,21 @@ python -m rl_env --repl
 from rl_env import ShadowFightEnv
 
 env = ShadowFightEnv()
-env.set_rounds(1)           # First-to-1 for fast episodes
-env.tick_speed(5.0)         # 5× faster training
+env.set_rounds(1)  # First-to-1 for fast episodes
+env.tick_speed(5.0)  # 5× faster training
 
-state = env.start()         # Arm auto-freeze, start fight, freeze at tick 0
-prev_p2_hp = state['opponent']['hp']
+state = env.start()  # Arm auto-freeze, start fight, freeze at tick 0
+prev_p2_hp = state["opponent"]["hp"]
 
 done = False
 while not done:
-    action = policy(state)                    # your RL policy
+    action = policy(state)  # your RL policy
     state = env.step(steps=6, action=action)  # 6 ticks per step ≈ 1 action frame
 
-    p1_hp = state['player']['hp']
-    p2_hp = state['opponent']['hp']
-    reward = (prev_p2_hp - p2_hp) - (state.get('damage_delta', {}).get('player', 0.0))
-    done = not state.get('in_fight', True)
+    p1_hp = state["player"]["hp"]
+    p2_hp = state["opponent"]["hp"]
+    reward = (prev_p2_hp - p2_hp) - (state.get("damage_delta", {}).get("player", 0.0))
+    done = not state.get("in_fight", True)
     prev_p2_hp = p2_hp
 
 env.exit()
@@ -966,10 +966,10 @@ Before calling `rpc.step(n, quad, btn)`, the `step()` method resolves the human-
 ```python
 # Example entries in ACTION_MAP
 ACTION_MAP = {
-    "p":   (0, "punch"),
-    "k":   (0, "kick"),
-    "wp":  (0, "weapon_punch"),
-    "dpp": (2, "punch"),   # down-forward + punch
+    "p": (0, "punch"),
+    "k": (0, "kick"),
+    "wp": (0, "weapon_punch"),
+    "dpp": (2, "punch"),  # down-forward + punch
     # ... full directional × button matrix
 }
 

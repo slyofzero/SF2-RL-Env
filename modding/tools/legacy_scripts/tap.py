@@ -6,32 +6,29 @@ Supports interactive multi-command inputs (e.g., 'up', 'down', 'right 5', 'down-
 using Python's input() utility.
 """
 
-import sys
 import argparse
-import time
-import subprocess
-import os
 import re
-from typing import Optional, Tuple
+import subprocess
+import sys
+import time
 
 from common import find_adb, get_connected_device
 
 # Known UI Coordinates for 1920x1080 resolution
 PRESETS = {
     # Navigation & Map UI
-    "fight": (1627, 858),        # Act 1 Map Stage 1 "FIGHT!" button
-    "tournament": (406, 450),    # Tournament Map Pin
-    "survival": (270, 640),      # Survival Map Pin
-    "lynx": (710, 500),          # Lynx Map Pin
-    "menu-open": (211, 150),     # Top-Left Menu Scroll
-    "menu-close": (237, 1021),   # Top-Left Menu Scroll
-    "menu-dojo": (115, 190),     # Top-Left Menu -> Dojo Pagoda icon
-    "menu-map": (115, 350),      # Top-Left Menu -> Act Map icon
-    "energy": (415, 45),         # Top Energy Bar / VIP Icon
-    "back": (80, 80),            # Back Arrow / Escape
-    "dialog_ok": (400, 930),     # Post-Match OK button
-    "center_ok": (960, 733),     # Center modal OK button (e.g. reward dialogs)
-
+    "fight": (1627, 858),  # Act 1 Map Stage 1 "FIGHT!" button
+    "tournament": (406, 450),  # Tournament Map Pin
+    "survival": (270, 640),  # Survival Map Pin
+    "lynx": (710, 500),  # Lynx Map Pin
+    "menu-open": (211, 150),  # Top-Left Menu Scroll
+    "menu-close": (237, 1021),  # Top-Left Menu Scroll
+    "menu-dojo": (115, 190),  # Top-Left Menu -> Dojo Pagoda icon
+    "menu-map": (115, 350),  # Top-Left Menu -> Act Map icon
+    "energy": (415, 45),  # Top Energy Bar / VIP Icon
+    "back": (80, 80),  # Back Arrow / Escape
+    "dialog_ok": (400, 930),  # Post-Match OK button
+    "center_ok": (960, 733),  # Center modal OK button (e.g. reward dialogs)
     # Joystick Directions
     "up": (250, 750),
     "down": (250, 970),
@@ -41,13 +38,11 @@ PRESETS = {
     "up-left": (50, 750),
     "down-left": (110, 950),
     "down-right": (330, 950),
-
     # Combat Attacks
     "punch": (1769, 802),
     "kick": (1699, 935),
     "shadow": (1615, 803),
     "ranged": (1699, 684),
-
     # Fight Menu
     "pause": (960, 170),
     "resume": (1380, 700),
@@ -76,7 +71,7 @@ ALIASES = {
 }
 
 
-def tap(x: int, y: int, device: Optional[str] = None, adb: Optional[str] = None, delay: float = 0.0) -> bool:
+def tap(x: int, y: int, device: str | None = None, adb: str | None = None, delay: float = 0.0) -> bool:
     """Dispatches a touch tap event to (x, y) on the target device."""
     if delay > 0:
         time.sleep(delay)
@@ -101,7 +96,7 @@ def tap(x: int, y: int, device: Optional[str] = None, adb: Optional[str] = None,
         return False
 
 
-def parse_command(cmd_str: str) -> Optional[Tuple[Tuple[int, int], int, str]]:
+def parse_command(cmd_str: str) -> tuple[tuple[int, int], int, str] | None:
     """
     Parses a single command string into ((x, y), count, label).
     Supported formats:
@@ -264,7 +259,7 @@ def main():
         success = tap(target_x, target_y, device=device, adb=adb)
         if not success:
             return 1
-        print(f"[SUCCESS] Tapped {label} ({target_x}, {target_y}) [{i+1}/{args.repeat}].")
+        print(f"[SUCCESS] Tapped {label} ({target_x}, {target_y}) [{i + 1}/{args.repeat}].")
 
     return 0
 

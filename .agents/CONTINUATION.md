@@ -44,9 +44,23 @@ import subprocess, time
 
 HD_ADB = r"C:\Program Files\BlueStacks_nxt\HD-Adb.exe"
 
+
 def start_tournament_fight():
     # 1. Launch game
-    subprocess.run([HD_ADB, "-s", "emulator-5554", "shell", "monkey", "-p", "com.nekki.catblasters", "-c", "android.intent.category.LAUNCHER", "1"])
+    subprocess.run(
+        [
+            HD_ADB,
+            "-s",
+            "emulator-5554",
+            "shell",
+            "monkey",
+            "-p",
+            "com.nekki.catblasters",
+            "-c",
+            "android.intent.category.LAUNCHER",
+            "1",
+        ]
+    )
     # 2. Wait for map screen (10-12s)
     time.sleep(12)
     # 3. Tap FIGHT! button at (1632, 864)

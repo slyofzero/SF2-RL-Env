@@ -8,14 +8,13 @@ Pipeline to build 'Cat Blasters 9k' modded standalone APK.
 6. Builds, zip-aligns, and signs with Android v1/v2/v3 signatures.
 """
 
-import os
-import io
-import shutil
-import zipfile
 import colorsys
+import os
+import shutil
 import subprocess
-from PIL import Image
+
 import UnityPy
+from PIL import Image
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 CACHE_DIR = os.path.join(ROOT_DIR, "modding", "build_cache")
@@ -30,10 +29,12 @@ ORIGINAL_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_OG.apk")
 # Can be changed here or passed via command line: --rounds <N>
 ROUNDS_TO_WIN = 5
 
+
 def arm64_movz(rd: int, imm16: int) -> bytes:
     """Encodes ARM64 32-bit MOVZ instruction: mov w{rd}, #{imm16}."""
-    val = (0x52800000) | ((imm16 & 0xffff) << 5) | (rd & 0x1f)
-    return val.to_bytes(4, 'little')
+    val = (0x52800000) | ((imm16 & 0xFFFF) << 5) | (rd & 0x1F)
+    return val.to_bytes(4, "little")
+
 
 # Protection rule: SF2_Modded_v1.apk through v7.apk must NEVER be overwritten!
 PROTECTED_V1_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v1.apk")
@@ -65,6 +66,7 @@ TARGET_ASSETS = {
     "assets/bin/Data/a475dfa934fc5384ebc0f36e30bb7b30": "dojo_atlas_layer3_low",
 }
 
+
 def hue_shift(img: Image.Image, shift_deg: float) -> Image.Image:
     img = img.convert("RGBA")
     pixels = img.load()
@@ -84,6 +86,7 @@ def hue_shift(img: Image.Image, shift_deg: float) -> Image.Image:
             out_pixels[x, y] = (int(nr * 255), int(ng * 255), int(nb * 255), pa)
     return out
 
+
 def apply_texture_mod(raw_bytes: bytes, target_texture_name: str, shift_deg: float = 180.0) -> bytes:
     env = UnityPy.load(raw_bytes)
     modified = False
@@ -99,10 +102,14 @@ def apply_texture_mod(raw_bytes: bytes, target_texture_name: str, shift_deg: flo
         return env.file.save()
     return raw_bytes
 
+
 def main():
     import argparse
+
     parser = argparse.ArgumentParser(description="Build Cat Blasters standalone APK.")
-    parser.add_argument("--rounds", type=int, default=ROUNDS_TO_WIN, help=f"Target rounds to win (default: {ROUNDS_TO_WIN})")
+    parser.add_argument(
+        "--rounds", type=int, default=ROUNDS_TO_WIN, help=f"Target rounds to win (default: {ROUNDS_TO_WIN})"
+    )
     parser.add_argument("--output", type=str, default=None, help="Custom output APK filename or path")
     args, _ = parser.parse_known_args()
     rounds = args.rounds
@@ -126,36 +133,35 @@ def main():
 
     print("\n=== Step 2: Renaming App Label to 'Cat Blasters 9k' ===")
     strings_path = os.path.join(APKTOOL_SRC, "res", "values", "strings.xml")
-    with open(strings_path, 'r', encoding='utf-8') as f:
+    with open(strings_path, encoding="utf-8") as f:
         strings_content = f.read()
 
     strings_content = strings_content.replace(
-        '<string name="app_name">Shadow Fight 2</string>',
-        '<string name="app_name">Cat Blasters 9k</string>'
+        '<string name="app_name">Shadow Fight 2</string>', '<string name="app_name">Cat Blasters 9k</string>'
     )
-    with open(strings_path, 'w', encoding='utf-8') as f:
+    with open(strings_path, "w", encoding="utf-8") as f:
         f.write(strings_content)
     print("  Updated res/values/strings.xml: app_name -> 'Cat Blasters 9k'")
 
     print("\n=== Step 3: Updating Package Name & Authorities ===")
     manifest_path = os.path.join(APKTOOL_SRC, "AndroidManifest.xml")
-    with open(manifest_path, 'r', encoding='utf-8') as f:
+    with open(manifest_path, encoding="utf-8") as f:
         manifest_content = f.read()
 
     # Replace package name and all provider authorities
-    manifest_content = manifest_content.replace('com.nekki.shadowfight', 'com.nekki.catblasters')
-    with open(manifest_path, 'w', encoding='utf-8') as f:
+    manifest_content = manifest_content.replace("com.nekki.shadowfight", "com.nekki.catblasters")
+    with open(manifest_path, "w", encoding="utf-8") as f:
         f.write(manifest_content)
     print("  Updated AndroidManifest.xml: package & authorities -> 'com.nekki.catblasters'")
 
     print("\n=== Step 4: Updating global-metadata.dat package paths ===")
     metadata_path = os.path.join(APKTOOL_SRC, "assets", "bin", "Data", "Managed", "Metadata", "global-metadata.dat")
-    with open(metadata_path, 'rb') as f:
+    with open(metadata_path, "rb") as f:
         meta_bytes = f.read()
 
     # 'com.nekki.shadowfight' and 'com.nekki.catblasters' are both exactly 21 bytes!
-    meta_bytes = meta_bytes.replace(b'com.nekki.shadowfight', b'com.nekki.catblasters')
-    with open(metadata_path, 'wb') as f:
+    meta_bytes = meta_bytes.replace(b"com.nekki.shadowfight", b"com.nekki.catblasters")
+    with open(metadata_path, "wb") as f:
         f.write(meta_bytes)
     print("  Updated global-metadata.dat binary strings (exact length match: 21 bytes)")
 
@@ -182,7 +188,7 @@ def main():
                 fpath = os.path.join(folder_path, fname)
                 if os.path.exists(fpath):
                     resized.save(fpath)
-            
+
             # For ic_launcher_background, create a dark sleek neon background
             bg_path = os.path.join(folder_path, "ic_launcher_background.png")
             if os.path.exists(bg_path):
@@ -195,10 +201,10 @@ def main():
     for rel_path, tex_name in TARGET_ASSETS.items():
         full_asset_path = os.path.join(APKTOOL_SRC, rel_path.replace("/", os.sep))
         if os.path.exists(full_asset_path):
-            with open(full_asset_path, 'rb') as f:
+            with open(full_asset_path, "rb") as f:
                 raw = f.read()
             modded_bytes = apply_texture_mod(raw, tex_name, shift_deg=180.0)
-            with open(full_asset_path, 'wb') as f:
+            with open(full_asset_path, "wb") as f:
                 f.write(modded_bytes)
     print("  Injected custom Dojo textures into Unity serialized assets.")
 
@@ -207,7 +213,7 @@ def main():
     gamedata_src = os.path.join(ROOT_DIR, "modding", "assets", "downloaded_gamedata")
     gamedata_dst = os.path.join(APKTOOL_SRC, "assets", "gamedata")
     os.makedirs(gamedata_dst, exist_ok=True)
-    for root, dirs, files in os.walk(gamedata_src):
+    for root, _dirs, files in os.walk(gamedata_src):
         for f in files:
             src_f = os.path.join(root, f)
             rel_f = os.path.relpath(src_f, gamedata_src)
@@ -221,7 +227,7 @@ def main():
     userdata_dst = os.path.join(APKTOOL_SRC, "assets", "userdata")
     if os.path.exists(userdata_src):
         os.makedirs(userdata_dst, exist_ok=True)
-        for root, dirs, files in os.walk(userdata_src):
+        for root, _dirs, files in os.walk(userdata_src):
             for f in files:
                 src_f = os.path.join(root, f)
                 rel_f = os.path.relpath(src_f, userdata_src)
@@ -232,34 +238,73 @@ def main():
 
     # 1c. Patch libil2cpp.so to bypass XML hash validation, data corruption checks, and Google Play warning
     so_patches = {
-        0x3598568: ("XML hash bypass (AMELFFLEPNF)", bytes.fromhex("20008052c0035fd6")), # mov w0, #1; ret
-        0x3594984: ("XML hash bypass direct (AMELFFLEPNF)", bytes.fromhex("20008052c0035fd6")), # mov w0, #1; ret
-        0x35951b4: ("XML hash check bypass (FNIHLBLMOBP)", bytes.fromhex("20008052c0035fd6")), # mov w0, #1; ret
-        0x3595870: ("XML hash check bypass (PBACHEOJBGG)", bytes.fromhex("20008052c0035fd6")), # mov w0, #1; ret
-        0x3595e1c: ("XML hash check bypass (PKACMGFBIKK)", bytes.fromhex("20008052c0035fd6")), # mov w0, #1; ret
-        0x30c3344: ("Data corruption check bypass (EOJDBAHODGK)", bytes.fromhex("20008052c0035fd6")), # mov w0, #1; ret
-        0x30c1250: ("Disable HackTitle dialog (MACGEGDGBOI)", bytes.fromhex("c0035fd61f2003d5")), # ret; nop
-        0x30c11d8: ("Bypass hack detector (HBGCPAEJCJJ)", bytes.fromhex("00008052c0035fd6")), # mov w0, #0; ret
-        0x34377f4: ("Disable Google Play warning dialog (NKLGCNHLBAF)", bytes.fromhex("21008052e2031faafea90114")), # mov w1, #1; mov x2, xzr; b 0x34a5ff4
-        0x3437afc: ("Disable Google Play check (JFGBPBOCOIC)", bytes.fromhex("00008052c0035fd6")), # mov w0, #0; ret
-        0x32d9388: ("Bypass ShowGDPR dialog (LJBDMDHNKFM.JFGBPBOCOIC)", bytes.fromhex("00008052c0035fd6")), # mov w0, #0; ret
-        0x325bd24: ("Disable CheckPacksNeeded (AAPGCAPGBLG.MCFHOHANNDH)", bytes.fromhex("00008052c0035fd6")), # mov w0, #0; ret
-        0x2ff0a10: ("Hook for one-time default Map scene redirect", bytes.fromhex("290d40b9aab400904b0148b9cb0000352b0080524b0108b93f0d007141000054a9008052692a00b90a030014")),
-        0x2ff1658: ("Redirect scene load to one-time Map hook", bytes.fromhex("eefcff17")), # b 0x2ff0a10
-        0x1cc5b44: ("Restore raid energy check (IEICNBBBNEJ.EHLKEFJNKPA)", bytes.fromhex("fe0f1ef8f44f01a9")),
-        0x3414c4c: ("Restore CIHKNMDAPBG instruction", bytes.fromhex("f44f44a9")),
-        0x296bd44: ("Restore Scene<object>.Update ret", bytes.fromhex("c0035fd6")),
-        0x3580ca4: ("Restore MapScene.PIMIMOACBNG instruction", bytes.fromhex("f50300aa")), # mov x21, x21
-        0x30c1258: ("Restore MACGEGDGBOI body", bytes.fromhex("fc6f05a9fa6706a9f85f07a9f65708a9f44f09a91d9d00b017820090938300b0948300b09c8300b0")),
-        0x3063e1c: ("Unlimited energy getter bypass (ACHLOMELAJE.PDKBJDBJOOK)", bytes.fromhex("20008052c0035fd6")), # mov w0, #1; ret
-        0x344aec8: ("Force VIP Unlimited Energy icon on MenuEnergyPanel UI", bytes.fromhex("34008052")), # mov w20, #1
-        0x305aaa4: ("Force field 0x238 (IsUnlimitedEnergy) in ACHLOMELAJE.MEBIEMOMELE", bytes.fromhex("28008052")), # mov w8, #1
-        0x3057bfc: ("Always allow energy spend (ACHLOMELAJE.AIIJFJLLIDB)", bytes.fromhex("20008052c0035fd6")), # mov w0, #1; ret
-        0x3057964: ("Always return 5 energy (ACHLOMELAJE.FMNEFEMHCGG)", bytes.fromhex("a0008052c0035fd6")), # mov w0, #5; ret
-        0x33e7d80: (f"Set match round victory target to {rounds} (FCJBEKHDLAF.DHKCOFBMIEL)", arm64_movz(22, rounds)), # mov w22, #rounds
-        0x33e9444: (f"Set EndRound victory threshold to {rounds} (FCJBEKHDLAF.AIFOMGABBBA)", arm64_movz(8, rounds)), # mov w8, #rounds
-        0x33ea8e4: (f"Set RoundModel target rounds to {rounds} (FCJBEKHDLAF.LPIEJMLPFBF)", arm64_movz(1, rounds)), # mov w1, #rounds
-        0x33ef960: ("Standard round winner branch (FCJBEKHDLAF.BBCAMJDDOII)", bytes.fromhex("48020054")), # b.hi 0x33ef9a8
+        0x3598568: ("XML hash bypass (AMELFFLEPNF)", bytes.fromhex("20008052c0035fd6")),  # mov w0, #1; ret
+        0x3594984: ("XML hash bypass direct (AMELFFLEPNF)", bytes.fromhex("20008052c0035fd6")),  # mov w0, #1; ret
+        0x35951B4: ("XML hash check bypass (FNIHLBLMOBP)", bytes.fromhex("20008052c0035fd6")),  # mov w0, #1; ret
+        0x3595870: ("XML hash check bypass (PBACHEOJBGG)", bytes.fromhex("20008052c0035fd6")),  # mov w0, #1; ret
+        0x3595E1C: ("XML hash check bypass (PKACMGFBIKK)", bytes.fromhex("20008052c0035fd6")),  # mov w0, #1; ret
+        0x30C3344: ("Data corruption check bypass (EOJDBAHODGK)", bytes.fromhex("20008052c0035fd6")),  # mov w0, #1; ret
+        0x30C1250: ("Disable HackTitle dialog (MACGEGDGBOI)", bytes.fromhex("c0035fd61f2003d5")),  # ret; nop
+        0x30C11D8: ("Bypass hack detector (HBGCPAEJCJJ)", bytes.fromhex("00008052c0035fd6")),  # mov w0, #0; ret
+        0x34377F4: (
+            "Disable Google Play warning dialog (NKLGCNHLBAF)",
+            bytes.fromhex("21008052e2031faafea90114"),
+        ),  # mov w1, #1; mov x2, xzr; b 0x34a5ff4
+        0x3437AFC: ("Disable Google Play check (JFGBPBOCOIC)", bytes.fromhex("00008052c0035fd6")),  # mov w0, #0; ret
+        0x32D9388: (
+            "Bypass ShowGDPR dialog (LJBDMDHNKFM.JFGBPBOCOIC)",
+            bytes.fromhex("00008052c0035fd6"),
+        ),  # mov w0, #0; ret
+        0x325BD24: (
+            "Disable CheckPacksNeeded (AAPGCAPGBLG.MCFHOHANNDH)",
+            bytes.fromhex("00008052c0035fd6"),
+        ),  # mov w0, #0; ret
+        0x2FF0A10: (
+            "Hook for one-time default Map scene redirect",
+            bytes.fromhex("290d40b9aab400904b0148b9cb0000352b0080524b0108b93f0d007141000054a9008052692a00b90a030014"),
+        ),
+        0x2FF1658: ("Redirect scene load to one-time Map hook", bytes.fromhex("eefcff17")),  # b 0x2ff0a10
+        0x1CC5B44: ("Restore raid energy check (IEICNBBBNEJ.EHLKEFJNKPA)", bytes.fromhex("fe0f1ef8f44f01a9")),
+        0x3414C4C: ("Restore CIHKNMDAPBG instruction", bytes.fromhex("f44f44a9")),
+        0x296BD44: ("Restore Scene<object>.Update ret", bytes.fromhex("c0035fd6")),
+        0x3580CA4: ("Restore MapScene.PIMIMOACBNG instruction", bytes.fromhex("f50300aa")),  # mov x21, x21
+        0x30C1258: (
+            "Restore MACGEGDGBOI body",
+            bytes.fromhex("fc6f05a9fa6706a9f85f07a9f65708a9f44f09a91d9d00b017820090938300b0948300b09c8300b0"),
+        ),
+        0x3063E1C: (
+            "Unlimited energy getter bypass (ACHLOMELAJE.PDKBJDBJOOK)",
+            bytes.fromhex("20008052c0035fd6"),
+        ),  # mov w0, #1; ret
+        0x344AEC8: ("Force VIP Unlimited Energy icon on MenuEnergyPanel UI", bytes.fromhex("34008052")),  # mov w20, #1
+        0x305AAA4: (
+            "Force field 0x238 (IsUnlimitedEnergy) in ACHLOMELAJE.MEBIEMOMELE",
+            bytes.fromhex("28008052"),
+        ),  # mov w8, #1
+        0x3057BFC: (
+            "Always allow energy spend (ACHLOMELAJE.AIIJFJLLIDB)",
+            bytes.fromhex("20008052c0035fd6"),
+        ),  # mov w0, #1; ret
+        0x3057964: (
+            "Always return 5 energy (ACHLOMELAJE.FMNEFEMHCGG)",
+            bytes.fromhex("a0008052c0035fd6"),
+        ),  # mov w0, #5; ret
+        0x33E7D80: (
+            f"Set match round victory target to {rounds} (FCJBEKHDLAF.DHKCOFBMIEL)",
+            arm64_movz(22, rounds),
+        ),  # mov w22, #rounds
+        0x33E9444: (
+            f"Set EndRound victory threshold to {rounds} (FCJBEKHDLAF.AIFOMGABBBA)",
+            arm64_movz(8, rounds),
+        ),  # mov w8, #rounds
+        0x33EA8E4: (
+            f"Set RoundModel target rounds to {rounds} (FCJBEKHDLAF.LPIEJMLPFBF)",
+            arm64_movz(1, rounds),
+        ),  # mov w1, #rounds
+        0x33EF960: (
+            "Standard round winner branch (FCJBEKHDLAF.BBCAMJDDOII)",
+            bytes.fromhex("48020054"),
+        ),  # b.hi 0x33ef9a8
     }
     for lib_so in [
         os.path.join(APKTOOL_SRC, "lib", "arm64-v8a", "libil2cpp.so"),
@@ -346,14 +391,12 @@ def main():
         print("Stderr:", res.stderr)
 
     # Copy final signed APK
-    shutil.copy(
-        os.path.join(signed_dir, "cat_blasters_unsigned-aligned-debugSigned.apk"),
-        output_apk
-    )
-    print(f"\n========================================================")
-    print(f"SUCCESS! Cat Blasters 9k Standalone APK generated at:")
-    print(f"  -> {output_apk} ({os.path.getsize(output_apk)/(1024*1024):.2f} MB)")
-    print(f"========================================================")
+    shutil.copy(os.path.join(signed_dir, "cat_blasters_unsigned-aligned-debugSigned.apk"), output_apk)
+    print("\n========================================================")
+    print("SUCCESS! Cat Blasters 9k Standalone APK generated at:")
+    print(f"  -> {output_apk} ({os.path.getsize(output_apk) / (1024 * 1024):.2f} MB)")
+    print("========================================================")
+
 
 if __name__ == "__main__":
     main()

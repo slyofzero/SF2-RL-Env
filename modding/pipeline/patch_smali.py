@@ -1,9 +1,11 @@
 import os
 import subprocess
 
-smali_path = os.path.join("modding", "build_cache", "baksmali_multidex", "com", "nekki", "catblasters", "AssetExtractor.smali")
+smali_path = os.path.join(
+    "modding", "build_cache", "baksmali_multidex", "com", "nekki", "catblasters", "AssetExtractor.smali"
+)
 
-with open(smali_path, "r", encoding="utf-8") as f:
+with open(smali_path, encoding="utf-8") as f:
     lines = f.readlines()
 
 out = []
@@ -143,6 +145,8 @@ smali_jar = os.path.join("modding", "tools", "smali.jar")
 baksmali_dir = os.path.join("modding", "build_cache", "baksmali_multidex")
 classes_dex = os.path.join("modding", "build_cache", "test.dex")
 
-res = subprocess.run(f'java -jar "{smali_jar}" a "{baksmali_dir}" -o "{classes_dex}"', shell=True, capture_output=True, text=True)
+res = subprocess.run(
+    f'java -jar "{smali_jar}" a "{baksmali_dir}" -o "{classes_dex}"', shell=True, capture_output=True, text=True
+)
 print("STDERR:", res.stderr)
 print("Return code:", res.returncode)

@@ -23,30 +23,24 @@ Usage:
         actions.disconnect()
 """
 
-import os
-import sys
-import time
 import argparse
+import os
 import subprocess
+import sys
 import threading
-from typing import Optional, Dict, Any
+import time
+from typing import Any
 
 try:
     import frida
 except ImportError:
     frida = None
 
-import os
-import sys
-import time
 import shutil
-import argparse
-import subprocess
-import threading
-from typing import Optional, Dict, Any
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass
@@ -56,10 +50,12 @@ try:
 except ImportError:
     frida = None
 
+
 def get_frida_endpoint() -> tuple:
     host = os.environ.get("FRIDA_HOST", "127.0.0.1")
     port = int(os.environ.get("FRIDA_PORT", "27042"))
     return host, port
+
 
 def ensure_frida_port_forward(port: int = 27042):
     if os.environ.get("FRIDA_DIRECT") == "1":
@@ -86,6 +82,7 @@ def ensure_frida_port_forward(port: int = 27042):
     except Exception:
         pass
 
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 HOOK_JS_PATH = os.path.join(SCRIPT_DIR, "frida", "game_actions.js")
 
@@ -96,7 +93,7 @@ class SF2GameActions:
     Fully emulator-agnostic (supports Docker/Redroid, Waydroid, AVDs, BlueStacks, or bare-metal).
     """
 
-    def __init__(self, host: Optional[str] = None, port: Optional[int] = None):
+    def __init__(self, host: str | None = None, port: int | None = None):
         default_host, default_port = get_frida_endpoint()
         self.host = host or default_host
         self.port = port or default_port
@@ -117,11 +114,11 @@ class SF2GameActions:
         if not os.path.exists(HOOK_JS_PATH):
             raise FileNotFoundError(f"Frida hook script not found: {HOOK_JS_PATH}")
 
-        with open(HOOK_JS_PATH, "r", encoding="utf-8") as f:
+        with open(HOOK_JS_PATH, encoding="utf-8") as f:
             js_code = f.read()
 
         try:
-            device_manager = frida.get_device_manager()
+            device_manager = frida.get_device_manager()  # type: ignore[attr-defined]
             device = device_manager.add_remote_device(f"{self.host}:{self.port}")
             self.session = device.attach("Gadget")
             self.script = self.session.create_script(js_code)
@@ -136,14 +133,14 @@ class SF2GameActions:
             self.is_connected = False
             return False
 
-    def _on_message(self, message: Dict[str, Any], data: Any):
+    def _on_message(self, message: dict[str, Any], data: Any):
         if message.get("type") == "send":
             payload = message.get("payload", {})
             if isinstance(payload, dict) and payload.get("event") == "action_completed":
                 self._last_event = payload
                 self._action_event.set()
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Queries the engine's current state (scene, in_fight, is_paused, tick count)."""
         if not self.is_connected or not self.script:
             raise RuntimeError("Not connected to game engine.")
@@ -219,7 +216,7 @@ class SF2GameActions:
             raise RuntimeError(f"set_rounds failed: {res.get('error')}")
         return res.get("rounds", n)
 
-    def get_rounds(self) -> Optional[int]:
+    def get_rounds(self) -> int | None:
         """Returns the currently patched rounds-to-win value, or None if unset this session."""
         if not self.is_connected or not self.script:
             raise RuntimeError("Not connected to game engine.")
@@ -246,7 +243,9 @@ class SF2GameActions:
 def main():
     parser = argparse.ArgumentParser(description="Shadow Fight 2 Native Game Actions Controller")
     parser.add_argument("action", choices=["pause", "resume", "exit", "start", "status"], help="Action to execute")
-    parser.add_argument("--host", type=str, default=None, help="Frida Gadget host (default: from FRIDA_HOST or 127.0.0.1)")
+    parser.add_argument(
+        "--host", type=str, default=None, help="Frida Gadget host (default: from FRIDA_HOST or 127.0.0.1)"
+    )
     parser.add_argument("--port", type=int, default=None, help="Frida Gadget port (default: from FRIDA_PORT or 27042)")
     args = parser.parse_args()
 
@@ -257,7 +256,9 @@ def main():
 
     try:
         status = controller.get_status()
-        print(f"[STATUS] Scene: {status.get('scene')}, In-Fight: {status.get('in_fight')}, Is-Paused: {status.get('is_paused')}, Ticks: {status.get('ticks')}")
+        print(
+            f"[STATUS] Scene: {status.get('scene')}, In-Fight: {status.get('in_fight')}, Is-Paused: {status.get('is_paused')}, Ticks: {status.get('ticks')}"
+        )
 
         if args.action == "status":
             pass
@@ -279,7 +280,9 @@ def main():
             print(f"[RESULT] Exit triggered: {ok}")
 
         final_status = controller.get_status()
-        print(f"[FINAL] Scene: {final_status.get('scene')}, In-Fight: {final_status.get('in_fight')}, Is-Paused: {final_status.get('is_paused')}")
+        print(
+            f"[FINAL] Scene: {final_status.get('scene')}, In-Fight: {final_status.get('in_fight')}, Is-Paused: {final_status.get('is_paused')}"
+        )
     finally:
         controller.disconnect()
 

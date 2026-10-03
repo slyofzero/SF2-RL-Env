@@ -1,6 +1,6 @@
-so_path = r'c:\Users\Ishan\Personal\Porfolio\Shadow Fight 2\modding\build_cache\apktool_src\lib\arm64-v8a\libil2cpp.so'
+so_path = r"c:\Users\Ishan\Personal\Porfolio\Shadow Fight 2\modding\build_cache\apktool_src\lib\arm64-v8a\libil2cpp.so"
 
-with open(so_path, 'rb') as f:
+with open(so_path, "rb") as f:
     # ScreenModel.UpdateVictories at file offset 0x355B26C
     f.seek(0x355B26C)
     data = f.read(128)

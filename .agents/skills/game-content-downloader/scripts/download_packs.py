@@ -6,10 +6,9 @@ Universal Content & Pack Downloader for Shadow Fight 2
 4. Generates an updated packs.xml and synchronized packs.xml.hash companion file.
 """
 
-import os
-import sys
-import hashlib
 import argparse
+import hashlib
+import os
 import urllib.request
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
@@ -19,6 +18,7 @@ DEFAULT_CONFIG_CDN = os.path.join(ROOT_DIR, "modding", "assets", "downloaded_gam
 DEFAULT_BUNDLES_DIR = os.path.join(ROOT_DIR, "modding", "assets", "downloaded_gamedata", "bundles")
 DEFAULT_PACKS_XML = os.path.join(ROOT_DIR, "modding", "assets", "downloaded_gamedata", "packs.xml")
 DEFAULT_PACKS_HASH = os.path.join(ROOT_DIR, "modding", "assets", "downloaded_gamedata", "packs.xml.hash")
+
 
 def discover_available_packs(config_cdn_path: str):
     """Parses config_cdn.xml and returns a dictionary of all available Android bundles."""
@@ -42,6 +42,7 @@ def discover_available_packs(config_cdn_path: str):
                 }
     return packs
 
+
 def download_single_pack(name: str, info: dict, bundles_dir: str):
     """Downloads an individual pack bundle and verifies integrity."""
     dst = os.path.join(bundles_dir, name.replace("/", os.sep))
@@ -52,10 +53,9 @@ def download_single_pack(name: str, info: dict, bundles_dir: str):
         print(f"  [Cached] {name} ({os.path.getsize(dst):,} bytes)")
         return name, dst, True
 
-    print(f"  [Downloading] {name} ({expected_size / (1024*1024):.2f} MB)...")
+    print(f"  [Downloading] {name} ({expected_size / (1024 * 1024):.2f} MB)...")
     req = urllib.request.Request(
-        info["Url"],
-        headers={"User-Agent": "UnityPlayer/2021.3.33f1 (UnityWebRequest/1.0, libcurl/7.84.0-DEV)"}
+        info["Url"], headers={"User-Agent": "UnityPlayer/2021.3.33f1 (UnityWebRequest/1.0, libcurl/7.84.0-DEV)"}
     )
     with urllib.request.urlopen(req) as resp, open(dst, "wb") as out:
         out.write(resp.read())
@@ -72,6 +72,7 @@ def download_single_pack(name: str, info: dict, bundles_dir: str):
 
     return name, dst, True
 
+
 def update_packs_catalog(packs_dict: dict, bundles_dir: str, output_xml: str, output_hash: str):
     """Generates an updated packs.xml catalog and computes its cryptographic MD5 companion."""
     root_packs = ET.Element("Packs")
@@ -84,14 +85,18 @@ def update_packs_catalog(packs_dict: dict, bundles_dir: str, output_xml: str, ou
             with open(bundle_path, "rb") as bf:
                 file_hash = hashlib.md5(bf.read()).hexdigest().upper()
 
-        ET.SubElement(root_packs, "Pack", {
-            "Name": name,
-            "Url": info["Url"],
-            "Version": info.get("MinVersion", "2.46.0"),
-            "Attach": "1",
-            "Hash": file_hash,
-            "Priority": "0"
-        })
+        ET.SubElement(
+            root_packs,
+            "Pack",
+            {
+                "Name": name,
+                "Url": info["Url"],
+                "Version": info.get("MinVersion", "2.46.0"),
+                "Attach": "1",
+                "Hash": file_hash,
+                "Priority": "0",
+            },
+        )
 
     tree_out = ET.ElementTree(root_packs)
     ET.indent(tree_out, space="  ")
@@ -107,11 +112,14 @@ def update_packs_catalog(packs_dict: dict, bundles_dir: str, output_xml: str, ou
     print(f"Updated {output_xml} ({len(root_packs)} packs registered)")
     print(f"Synchronized {output_hash} -> {md5_val}")
 
+
 def main():
     parser = argparse.ArgumentParser(description="Download game asset bundles from config_cdn.xml")
     parser.add_argument("--names", nargs="*", help="Specific pack names to download (e.g. ZONE_1 EVENTS/MA_FEST_26)")
     parser.add_argument("--all", action="store_true", help="Download all available packs found in config_cdn.xml")
-    parser.add_argument("--pattern", help="Download packs matching a substring pattern (e.g. 'ZONE', 'OFFERS', 'EVENT')")
+    parser.add_argument(
+        "--pattern", help="Download packs matching a substring pattern (e.g. 'ZONE', 'OFFERS', 'EVENT')"
+    )
     parser.add_argument("--config", default=DEFAULT_CONFIG_CDN, help="Path to config_cdn.xml")
     parser.add_argument("--outdir", default=DEFAULT_BUNDLES_DIR, help="Destination directory for bundles")
     args = parser.parse_args()
@@ -149,6 +157,7 @@ def main():
             f.result()
 
     update_packs_catalog(available, args.outdir, DEFAULT_PACKS_XML, DEFAULT_PACKS_HASH)
+
 
 if __name__ == "__main__":
     main()

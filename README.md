@@ -119,9 +119,9 @@ for step in range(1000):
     action = env.action_space.sample()
     obs, reward, terminated, truncated, info = env.step(action)
 
-    print(f"Step {step:4d} | reward={reward:+.3f} | "
-          f"player_hp={info['player_hp']:.2f} | "
-          f"enemy_hp={info['enemy_hp']:.2f}")
+    print(
+        f"Step {step:4d} | reward={reward:+.3f} | player_hp={info['player_hp']:.2f} | enemy_hp={info['enemy_hp']:.2f}"
+    )
 
     if terminated or truncated:
         obs, info = env.reset()

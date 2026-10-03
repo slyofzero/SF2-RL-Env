@@ -1,16 +1,16 @@
 import struct
 
-so_path = r'c:\Users\Ishan\Personal\Porfolio\Shadow Fight 2\modding\build_cache\apktool_src\lib\arm64-v8a\libil2cpp.so'
+so_path = r"c:\Users\Ishan\Personal\Porfolio\Shadow Fight 2\modding\build_cache\apktool_src\lib\arm64-v8a\libil2cpp.so"
 
 # String literal pointer or address in 64-bit little endian
 target_addr = 0x42887D0
 
 # In ARM64, adrp + add or pointer in .data/.rodata
-with open(so_path, 'rb') as f:
+with open(so_path, "rb") as f:
     data = f.read()
 
 # Check direct 8-byte pointer
-target_bytes = struct.pack('<Q', target_addr)
+target_bytes = struct.pack("<Q", target_addr)
 pos = 0
 found_ptrs = []
 while True:

@@ -6,15 +6,16 @@ bypassing disk I/O on device, avoiding subprocess overhead, and eliminating UTF-
 PowerShell redirection corruption and ADB startup banner noise.
 """
 
-import sys
-import os
-import time
-import socket
 import argparse
+import os
+import socket
 import subprocess
+import sys
+import time
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass
@@ -30,19 +31,28 @@ ADB_HOST = "127.0.0.1"
 ADB_PORT = 5037
 PNG_HEADER = b"\x89PNG\r\n\x1a\n"
 
+
 def get_artifact_dir() -> str:
     brain_base = os.path.expanduser(r"~/.gemini/antigravity/brain")
     if os.path.exists(brain_base):
-        subdirs = [os.path.join(brain_base, d) for d in os.listdir(brain_base) if os.path.isdir(os.path.join(brain_base, d)) and d != "tempmediaStorage"]
+        subdirs = [
+            os.path.join(brain_base, d)
+            for d in os.listdir(brain_base)
+            if os.path.isdir(os.path.join(brain_base, d)) and d != "tempmediaStorage"
+        ]
         if subdirs:
+
             def get_transcript_mtime(d):
                 t = os.path.join(d, ".system_generated", "logs", "transcript.jsonl")
                 return os.path.getmtime(t) if os.path.exists(t) else 0
+
             subdirs.sort(key=get_transcript_mtime, reverse=True)
             return subdirs[0]
     return os.getcwd()
 
+
 ARTIFACT_DIR = get_artifact_dir()
+
 
 def find_adb_binary() -> str:
     """Finds adb binary in an emulator- and OS-agnostic manner."""
@@ -51,6 +61,7 @@ def find_adb_binary() -> str:
         return env_adb
 
     import shutil
+
     path_adb = shutil.which("adb")
     if path_adb:
         return path_adb
@@ -60,6 +71,7 @@ def find_adb_binary() -> str:
             return p
 
     return "adb"
+
 
 def is_server_listening(host: str = ADB_HOST, port: int = ADB_PORT) -> bool:
     """Checks if the ADB daemon is already listening on port 5037."""
@@ -72,28 +84,29 @@ def is_server_listening(host: str = ADB_HOST, port: int = ADB_PORT) -> bool:
     except Exception:
         return False
 
+
 def ensure_adb_server(adb_bin: str = None) -> bool:
     """Ensures that the ADB server is listening on port 5037."""
     if is_server_listening():
         return True
-    
+
     if adb_bin is None:
         adb_bin = find_adb_binary()
-    
+
     if not os.path.exists(adb_bin) and adb_bin != "adb":
         return False
-    
+
     # Start server with nodaemon in a detached background process
     creationflags = 0
     if sys.platform == "win32":
-        creationflags = 0x08000000 # CREATE_NO_WINDOW
-    
+        creationflags = 0x08000000  # CREATE_NO_WINDOW
+
     try:
         subprocess.Popen(
             [adb_bin, "server", "nodaemon"],
             creationflags=creationflags,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
+            stderr=subprocess.DEVNULL,
         )
     except Exception:
         # Fallback to start-server
@@ -107,9 +120,10 @@ def ensure_adb_server(adb_bin: str = None) -> bool:
         time.sleep(0.05)
     return is_server_listening()
 
+
 def _send_adb_cmd(sock: socket.socket, cmd: str) -> None:
     """Encodes and sends an ADB protocol command (4-hex length + payload) and checks for OKAY."""
-    msg = f"{len(cmd):04x}{cmd}".encode("utf-8")
+    msg = f"{len(cmd):04x}{cmd}".encode()
     sock.sendall(msg)
     resp = sock.recv(4)
     if resp != b"OKAY":
@@ -120,6 +134,7 @@ def _send_adb_cmd(sock: socket.socket, cmd: str) -> None:
         except Exception:
             err = f"Unexpected response: {resp}"
         raise RuntimeError(f"ADB protocol error for command '{cmd}': {err}")
+
 
 def get_connected_devices() -> list[str]:
     """Queries the ADB server for a list of connected device serials."""
@@ -141,6 +156,7 @@ def get_connected_devices() -> list[str]:
     finally:
         s.close()
 
+
 def capture_screenshot_bytes(serial: str = None, timeout: float = 5.0) -> tuple[bytes, float]:
     """
     Captures raw PNG screenshot bytes directly via ADB socket in ~350-450ms.
@@ -148,7 +164,7 @@ def capture_screenshot_bytes(serial: str = None, timeout: float = 5.0) -> tuple[
     """
     t0 = time.time()
     ensure_adb_server()
-    
+
     if not serial:
         env_serial = os.environ.get("ANDROID_SERIAL") or os.environ.get("ADB_DEVICE")
         if env_serial:
@@ -158,7 +174,9 @@ def capture_screenshot_bytes(serial: str = None, timeout: float = 5.0) -> tuple[
             if devices:
                 serial = devices[0]
             else:
-                raise RuntimeError("No active Android device or emulator found on ADB. Ensure an emulator or container is running.")
+                raise RuntimeError(
+                    "No active Android device or emulator found on ADB. Ensure an emulator or container is running."
+                )
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.settimeout(timeout)
@@ -180,10 +198,11 @@ def capture_screenshot_bytes(serial: str = None, timeout: float = 5.0) -> tuple[
     idx = raw.find(PNG_HEADER)
     if idx == -1:
         raise ValueError(f"No valid PNG signature found in screencap output ({len(raw)} bytes received)")
-    
+
     png_data = raw[idx:]
     elapsed = time.time() - t0
     return png_data, elapsed
+
 
 def capture_fallback(serial: str = DEFAULT_SERIAL) -> tuple[bytes, float]:
     """Subprocess fallback using HD-Adb.exe exec-out."""
@@ -196,11 +215,9 @@ def capture_fallback(serial: str = DEFAULT_SERIAL) -> tuple[bytes, float]:
     elapsed = time.time() - t0
     return res.stdout[idx:], elapsed
 
+
 def save_screenshot(
-    output_path: str = None,
-    serial: str = None,
-    crop_box: tuple[int, int, int, int] = None,
-    quiet: bool = False
+    output_path: str = None, serial: str = None, crop_box: tuple[int, int, int, int] = None, quiet: bool = False
 ) -> tuple[str, float]:
     """
     Captures screenshot and writes to output_path.
@@ -225,8 +242,10 @@ def save_screenshot(
         data, elapsed = capture_fallback(serial=serial or DEFAULT_SERIAL)
 
     if crop_box:
-        from PIL import Image
         import io
+
+        from PIL import Image
+
         img = Image.open(io.BytesIO(data))
         cropped = img.crop(crop_box)
         cropped.save(output_path, "PNG")
@@ -236,9 +255,10 @@ def save_screenshot(
 
     if not quiet:
         size_kb = len(data) / 1024
-        print(f"Captured screenshot in {elapsed*1000:.1f}ms ({size_kb:.1f} KB) -> {output_path}")
+        print(f"Captured screenshot in {elapsed * 1000:.1f}ms ({size_kb:.1f} KB) -> {output_path}")
 
     return output_path, elapsed
+
 
 def main():
     parser = argparse.ArgumentParser(description="Instantly capture BlueStacks / Android screen in <500ms.")
@@ -264,13 +284,9 @@ def main():
         else:
             out_file = os.path.abspath(name)
 
-    saved_path, elapsed = save_screenshot(
-        output_path=out_file,
-        serial=args.serial,
-        crop_box=crop,
-        quiet=args.quiet
-    )
+    saved_path, elapsed = save_screenshot(output_path=out_file, serial=args.serial, crop_box=crop, quiet=args.quiet)
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

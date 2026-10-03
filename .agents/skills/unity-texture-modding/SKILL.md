@@ -34,6 +34,7 @@ Scan Unity data files to find target textures:
 import os
 import UnityPy
 
+
 def scan_textures(unity_dir: str):
     found = {}
     for fname in os.listdir(unity_dir):
@@ -58,6 +59,7 @@ To apply a color shift (e.g. cyber-themed hue rotation) via HSV:
 ```python
 import colorsys
 from PIL import Image
+
 
 def hue_shift_image(img: Image.Image, shift_degrees: float) -> Image.Image:
     """Rotates image hue while preserving transparency and brightness."""

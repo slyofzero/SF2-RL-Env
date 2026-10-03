@@ -7,8 +7,8 @@ Leaves SF2_Modded_v1.apk and SF2_Modded_v2.apk completely untouched.
 
 import os
 import shutil
-import zipfile
 import subprocess
+import zipfile
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 V2_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v2.apk")
@@ -20,20 +20,31 @@ CACHE_DIR = os.path.join(ROOT_DIR, "modding", "build_cache")
 PROTECTED_V1_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v1.apk")
 PROTECTED_V2_APK = os.path.join(ROOT_DIR, "bluestacks", "apks", "SF2_Modded_v2.apk")
 if os.path.abspath(OUTPUT_APK) in (os.path.abspath(PROTECTED_V1_APK), os.path.abspath(PROTECTED_V2_APK)):
-    raise ValueError("SF2_Modded_v1.apk and SF2_Modded_v2.apk are protected historical milestones and must NEVER be overwritten.")
+    raise ValueError(
+        "SF2_Modded_v1.apk and SF2_Modded_v2.apk are protected historical milestones and must NEVER be overwritten."
+    )
 
 ENERGY_PATCHES = {
     # 1. PDKBJDBJOOK: IsUnlimitedEnergy property getter -> return true (mov w0, #1; ret)
-    0x3063e1c: ("PDKBJDBJOOK (IsUnlimitedEnergy getter)", bytes.fromhex("00e04839c0035fd6"), bytes.fromhex("20008052c0035fd6")),
+    0x3063E1C: (
+        "PDKBJDBJOOK (IsUnlimitedEnergy getter)",
+        bytes.fromhex("00e04839c0035fd6"),
+        bytes.fromhex("20008052c0035fd6"),
+    ),
     # 2. MenuEnergyPanel.UpdateView: Force unlimited VIP energy icon (mov w20, #1)
-    0x344aec8: ("MenuEnergyPanel UI VIP icon", bytes.fromhex("14e14839"), bytes.fromhex("34008052")),
+    0x344AEC8: ("MenuEnergyPanel UI VIP icon", bytes.fromhex("14e14839"), bytes.fromhex("34008052")),
     # 3. ACHLOMELAJE.MEBIEMOMELE: Force field 0x238 (IsUnlimitedEnergy) (mov w8, #1)
-    0x305aaa4: ("ACHLOMELAJE field 0x238", bytes.fromhex("28000012"), bytes.fromhex("28008052")),
+    0x305AAA4: ("ACHLOMELAJE field 0x238", bytes.fromhex("28000012"), bytes.fromhex("28008052")),
     # 4. ACHLOMELAJE.AIIJFJLLIDB: SpendEnergy check -> return true (mov w0, #1; ret)
-    0x3057bfc: ("AIIJFJLLIDB (SpendEnergy check)", bytes.fromhex("fe0f1ef8f44f01a9"), bytes.fromhex("20008052c0035fd6")),
+    0x3057BFC: (
+        "AIIJFJLLIDB (SpendEnergy check)",
+        bytes.fromhex("fe0f1ef8f44f01a9"),
+        bytes.fromhex("20008052c0035fd6"),
+    ),
     # 5. ACHLOMELAJE.FMNEFEMHCGG: get_Energy count -> return 5 (mov w0, #5; ret)
     0x3057964: ("FMNEFEMHCGG (get_Energy count)", bytes.fromhex("080841f9010c41f9"), bytes.fromhex("a0008052c0035fd6")),
 }
+
 
 def main():
     print(f"=== Building SF2_Modded_v3.apk from baseline: {os.path.basename(V2_APK)} ===")
@@ -43,21 +54,23 @@ def main():
     print("Step 1: Reading baseline v2 APK and extracting libil2cpp.so...")
     with zipfile.ZipFile(V2_APK, "r") as z_in:
         so_data = bytearray(z_in.read("lib/arm64-v8a/libil2cpp.so"))
-        
+
         # Verify and apply patches
         print("Step 2: Applying 5 Infinite Energy patches to lib/arm64-v8a/libil2cpp.so...")
         for offset, (desc, expected_orig, patch_bytes) in ENERGY_PATCHES.items():
-            actual_orig = bytes(so_data[offset:offset+len(expected_orig)])
+            actual_orig = bytes(so_data[offset : offset + len(expected_orig)])
             if actual_orig != expected_orig:
-                print(f"  [Warning] Offset {hex(offset)} ({desc}) had {actual_orig.hex()}, expected {expected_orig.hex()}")
-            so_data[offset:offset+len(patch_bytes)] = patch_bytes
+                print(
+                    f"  [Warning] Offset {hex(offset)} ({desc}) had {actual_orig.hex()}, expected {expected_orig.hex()}"
+                )
+            so_data[offset : offset + len(patch_bytes)] = patch_bytes
             print(f"  [Patched] {desc} at {hex(offset)} -> {patch_bytes.hex()}")
 
         # 3. Create unsigned APK with all files from v2, updated so, and no META-INF
         os.makedirs(CACHE_DIR, exist_ok=True)
         unsigned_apk = os.path.join(CACHE_DIR, "v3_unsigned.apk")
         print(f"Step 3: Repackaging APK to {unsigned_apk}...")
-        
+
         with zipfile.ZipFile(unsigned_apk, "w", compression=zipfile.ZIP_DEFLATED) as z_out:
             for item in z_in.infolist():
                 # Skip old signatures
@@ -93,15 +106,16 @@ def main():
     # 5. Copy to final output APK
     signed_files = [f for f in os.listdir(signed_dir) if f.endswith(".apk")]
     assert len(signed_files) > 0, f"Signing failed, no output APK in {signed_dir}"
-    
+
     final_signed_apk = os.path.join(signed_dir, signed_files[0])
     shutil.copy2(final_signed_apk, OUTPUT_APK)
-    
+
     size_mb = os.path.getsize(OUTPUT_APK) / (1024 * 1024)
-    print(f"\n========================================================")
-    print(f"SUCCESS! SF2_Modded_v3.apk generated at:")
+    print("\n========================================================")
+    print("SUCCESS! SF2_Modded_v3.apk generated at:")
     print(f"  -> {OUTPUT_APK} ({size_mb:.2f} MB)")
-    print(f"========================================================")
+    print("========================================================")
+
 
 if __name__ == "__main__":
     main()

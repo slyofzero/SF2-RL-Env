@@ -2,9 +2,10 @@
 """
 Test direct evdev input on Android.
 """
-import sys
-import time
+
 import subprocess
+import time
+
 from common import find_adb, get_connected_device
 
 adb = find_adb()

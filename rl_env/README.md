@@ -81,11 +81,11 @@ python scripts/start_frida_service.py --watch
 from rl_env import ShadowFightEnv
 
 env = ShadowFightEnv()
-state = env.start()          # freeze at tick 1, returns initial state
+state = env.start()  # freeze at tick 1, returns initial state
 print(state)
 
 for _ in range(20):
-    state = env.step(action='dp')   # forward-dash + punch, advance 1 tick
+    state = env.step(action="dp")  # forward-dash + punch, advance 1 tick
 
 env.close()
 ```
@@ -138,7 +138,7 @@ flowchart TD
 ### Constructor
 
 ```python
-ShadowFightEnv(host='127.0.0.1', port=27042)
+ShadowFightEnv(host="127.0.0.1", port=27042)
 ```
 
 | Parameter | Type | Default | Description |
@@ -151,23 +151,29 @@ ShadowFightEnv(host='127.0.0.1', port=27042)
 
 ---
 
-### Methods
+### Properties & Methods
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `connect()` | `bool` | Explicitly attach to Frida. Auto-called on first use of any method. |
-| `start(timeout=20.0)` | `Dict` | Queue a fight start, arm auto-freeze, advance 1 tick, return initial state. |
-| `step(steps=None, action=None)` | `Dict` | Advance `steps` ticks (default `1`). Optionally inject an `action` before stepping. Returns state after the final tick. |
-| `freeze()` | `bool` | Freeze `FixedUpdate()` — game physics halts completely. |
-| `unfreeze()` | `bool` | Resume continuous `FixedUpdate()` execution. |
-| `tick_speed(speed=None)` | `float` | Set Unity `timeScale` multiplier. Pass `None` to query current speed. |
-| `pause()` | `bool` | Issue a native IL2CPP in-engine pause (the game's own pause menu state). |
-| `resume()` | `bool` | Issue a native IL2CPP in-engine unpause. |
-| `exit()` | `bool` | Surrender the current fight and return to the Act map. |
-| `set_rounds(n)` | `int` | Patch rounds-to-win to `n` (1–99) in live process memory. No APK rebuild needed. |
-| `get_rounds()` | `Optional[int]` | Return the currently patched round count, or `None` if not set. |
-| `get_state()` | `Dict` | Read and return the current telemetry frame without advancing any ticks. |
-| `close()` | `None` | Detach from Frida, restore `timeScale` to `1.0x`. Call in `finally` blocks. |
+| Member | Type | Returns | Description |
+|--------|------|---------|-------------|
+| `env.equipment` | Property | `Dict` | Current equipment loadouts for player and opponent (`weapon`, `armor`, `helm`, `ranged`, `magic`). |
+| `env.round` | Property | `int` | Current round number (1-indexed). |
+| `env.current_round` | Property | `int` | Alias for `env.round`. |
+| `env.metadata` | Property | `Dict` | Full fight metadata (equipment, round count, scores, round history). |
+| `connect()` | Method | `bool` | Explicitly attach to Frida. Auto-called on first use of any method. |
+| `start(timeout=20.0)` | Method | `Dict` | Queue fight start, announce round & equipment, arm auto-freeze, advance 1 tick, return initial state. |
+| `step(steps=None, action=None)` | Method | `Dict` | Advance `steps` ticks (default `1`). Optionally inject an `action` before stepping. Returns state after the final tick. |
+| `freeze()` | Method | `bool` | Freeze `FixedUpdate()` — game physics halts completely. |
+| `unfreeze()` | Method | `bool` | Resume continuous `FixedUpdate()` execution. |
+| `tick_speed(speed=None)` | Method | `float` | Set Unity `timeScale` multiplier. Pass `None` to query current speed. |
+| `pause()` | Method | `bool` | Issue a native IL2CPP in-engine pause (the game's own pause menu state). |
+| `resume()` | Method | `bool` | Issue a native IL2CPP in-engine unpause. |
+| `exit()` | Method | `bool` | Surrender the current fight and return to the Act map. |
+| `set_rounds(n)` | Method | `int` | Patch rounds-to-win to `n` (1–65535) in live process memory. No APK rebuild needed. |
+| `get_rounds()` | Method | `Optional[int]` | Return the currently patched round count, or `None` if not set. |
+| `get_state()` | Method | `Dict` | Read and return the current telemetry frame without advancing any ticks. |
+| `get_metadata()` | Method | `Dict` | Return current fight metadata. |
+| `get_equipment()` | Method | `Dict` | Return current equipment dictionary. |
+| `close()` | Method | `None` | Detach from Frida, restore `timeScale` to `1.0x`. Call in `finally` blocks. |
 | `state` *(property)* | `Dict` | The last state dict returned by `start()`, `step()`, or `get_state()`. |
 
 ---
@@ -321,35 +327,53 @@ python -m rl_env
 
 | Command | Description |
 |---------|-------------|
-| `start` | Start fight, arm auto-freeze, step 1 tick, print state. |
-| `step <N> [action]` | Step `N` ticks; optionally inject `action` first. |
-| `<N>` | Shorthand for `step <N>`. E.g. `10` steps 10 ticks. |
-| `f` / `freeze` | Freeze physics — `FixedUpdate()` halts. |
-| `u` / `unfreeze` | Resume continuous physics. |
-| `speed <N>` | Set simulation speed multiplier (e.g. `speed 5`). |
-| `pause` | Native IL2CPP in-engine pause. |
-| `resume` | Native IL2CPP in-engine unpause. |
-| `exit` | Surrender fight and return to Act map. |
-| `rounds <N>` | Patch rounds-to-win to `N` at runtime. |
-| `rounds` | Print currently patched round count. |
-| `state` / `status` | Dump full state JSON to stdout. |
-| *Action codes* | Any key from the Action Map (e.g. `p`, `dpp`, `wk`, `dd`). Executes the action and steps 1 tick. |
-| `q` / `quit` | Exit the REPL and detach from Frida. |
+| `/start` | Start the fight, arm auto-freeze at tick 0, advance 1 tick. |
+| `/metadata` | Print fight metadata (equipment loadout, current round, scores). |
+| `/pause` | Native in-engine pause. |
+| `/resume` | Native in-engine resume / unpause. |
+| `/exit` | Exit fight and return back to Act map. |
+| `/speed <n>` | Change simulation speed multiplier (e.g. `/speed 2.0`). |
+| `/step <number>` | Step `N` ticks (e.g. `/step 10`, or hit `[Enter]` for 1 tick). |
+| `/freeze` | Freeze physics in place (`FixedUpdate` halts). |
+| `/unfreeze` | Resume continuous 60Hz physics. |
+| `/state` | Get and print current combat state JSON. |
+| `<action>` | **Type actions directly!** (e.g. `p`, `k`, `dp`, `sp`, `wp`, `dk`, `sk`, `wk`, `dd`, `aa`, etc.). |
+| `<action> <N>` | Perform action and advance `N` ticks (e.g. `dp 10`, `p 5`). |
+| `/q` / `/quit` | Exit the REPL and detach cleanly. |
+
+*(Note: commands can also be typed without the leading `/`, e.g. `start`, `step 10`, `speed 2`)*
 
 **Example REPL session:**
 
-```
-sf2> start
-{'tick': 1, 'frozen': True, 'player': {'hp': 1.0, ...}, ...}
-sf2> speed 3
-3.0
-sf2> 50
-{'tick': 51, ...}
-sf2> dpp
-{'tick': 52, 'opponent': {'hp': 0.88, ...}, ...}
-sf2> state
-{full JSON...}
-sf2> quit
+```text
+env [FROZEN] > /start
+[*] Starting fight, arming auto-freeze, advancing 1 tick...
+[OK] Fight started!
+     R1 | Tick:    1 | Clock:  99.0s | Dist: 360.5 | P1: 100.0% (KnivesStartStanceIdle) | P2: 100.0% (Stand)
+
+env [FROZEN] > p
+ -> [ACT: P   ] R1 | Tick:    2 | Clock:  99.0s | Dist: 360.5 | P1: 100.0% (KnivesSlash) | P2: 100.0% (Stand)
+
+env [FROZEN] > dp 10
+ -> [DP   +10 ticks] R1 | Tick:   12 | Clock:  98.8s | Dist: 350.2 | P1: 100.0% (KnivesSuperSlash) | P2: 100.0% (Stand)
+
+env [FROZEN] > /state
+{
+  "tick": 12,
+  "clock": 98.8,
+  "player": { "hp": 1.0, ... }
+}
+
+env [FROZEN] > /pause
+[OK] Pause triggered: True
+
+env [FROZEN] > /resume
+[OK] Resume triggered: True
+
+env [FROZEN] > /exit
+[OK] Exit back to map triggered: True
+
+env [FROZEN] > /q
 ```
 
 ---
@@ -409,24 +433,26 @@ try:
 
     while not done:
         # Choose an action (replace with your policy)
-        action = 'dp'  # forward punch
+        action = "dp"  # forward punch
 
         # Advance 1 physics tick
         state = env.step(steps=1, action=action)
 
         # Accumulate reward signal
-        total_damage += state['damage_delta']['opponent']
+        total_damage += state["damage_delta"]["opponent"]
 
         # Check terminal condition
-        player_hp   = state['player']['hp']
-        opponent_hp = state['opponent']['hp']
-        in_fight    = state['in_fight']
+        player_hp = state["player"]["hp"]
+        opponent_hp = state["opponent"]["hp"]
+        in_fight = state["in_fight"]
 
         if player_hp <= 0 or opponent_hp <= 0 or not in_fight:
             done = True
 
-        print(f"Tick {state['tick']:5d} | P:{player_hp:.2f} vs O:{opponent_hp:.2f}"
-              f" | dmg Δ {state['damage_delta']['opponent']:.3f}")
+        print(
+            f"Tick {state['tick']:5d} | P:{player_hp:.2f} vs O:{opponent_hp:.2f}"
+            f" | dmg Δ {state['damage_delta']['opponent']:.3f}"
+        )
 
     print(f"\nEpisode complete. Total damage dealt: {total_damage:.4f}")
 

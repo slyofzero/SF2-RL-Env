@@ -6,11 +6,9 @@ Android Studio AVDs, Cuttlefish, and bare-metal Android devices.
 """
 
 import os
-import sys
 import shutil
 import subprocess
-import time
-from typing import Optional, Tuple
+import sys
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 APK_NAME = "SF2_Modded_v8.apk"
@@ -59,7 +57,7 @@ def find_adb() -> str:
     return "adb"
 
 
-def get_connected_device(adb: Optional[str] = None) -> Optional[str]:
+def get_connected_device(adb: str | None = None) -> str | None:
     """
     Discovers an active Android device or emulator serial:
     1. Checks ANDROID_SERIAL or ADB_DEVICE environment variable.
@@ -98,7 +96,7 @@ def get_connected_device(adb: Optional[str] = None) -> Optional[str]:
     return None
 
 
-def get_frida_endpoint() -> Tuple[str, int]:
+def get_frida_endpoint() -> tuple[str, int]:
     """
     Returns (host, port) for Frida Gadget connection.
     Supports remote containers / Docker IP without ADB port forwarding.
@@ -108,7 +106,9 @@ def get_frida_endpoint() -> Tuple[str, int]:
     return host, port
 
 
-def ensure_frida_port_forward(port: int = DEFAULT_FRIDA_PORT, adb: Optional[str] = None, device: Optional[str] = None) -> bool:
+def ensure_frida_port_forward(
+    port: int = DEFAULT_FRIDA_PORT, adb: str | None = None, device: str | None = None
+) -> bool:
     """
     Ensures ADB port forwarding to Frida Gadget is active if connecting locally.
     Skipped if FRIDA_DIRECT=1 (e.g. Docker container with exposed port).
@@ -129,7 +129,7 @@ def ensure_frida_port_forward(port: int = DEFAULT_FRIDA_PORT, adb: Optional[str]
         return False
 
 
-def is_installed(package_name: str = DEFAULT_PACKAGE, device: Optional[str] = None) -> bool:
+def is_installed(package_name: str = DEFAULT_PACKAGE, device: str | None = None) -> bool:
     """Checks whether the specified Android package is installed on the device."""
     adb = find_adb()
     serial = device or get_connected_device(adb)
@@ -148,7 +148,7 @@ def is_installed(package_name: str = DEFAULT_PACKAGE, device: Optional[str] = No
     return False
 
 
-def install_apk(apk_path: str = DEFAULT_APK, device: Optional[str] = None) -> bool:
+def install_apk(apk_path: str = DEFAULT_APK, device: str | None = None) -> bool:
     """Installs or updates the specified APK on the target device."""
     if not os.path.exists(apk_path):
         print(f"[Error] APK file not found at: {apk_path}", file=sys.stderr)
@@ -174,7 +174,7 @@ def install_apk(apk_path: str = DEFAULT_APK, device: Optional[str] = None) -> bo
         return False
 
 
-def is_running(package_name: str = DEFAULT_PACKAGE, device: Optional[str] = None) -> bool:
+def is_running(package_name: str = DEFAULT_PACKAGE, device: str | None = None) -> bool:
     """Checks if the app package currently has a running process."""
     adb = find_adb()
     serial = device or get_connected_device(adb)
@@ -189,7 +189,7 @@ def is_running(package_name: str = DEFAULT_PACKAGE, device: Optional[str] = None
         return False
 
 
-def boot_app(package_name: str = DEFAULT_PACKAGE, device: Optional[str] = None) -> bool:
+def boot_app(package_name: str = DEFAULT_PACKAGE, device: str | None = None) -> bool:
     """Launches the app on the target device via monkey or am start."""
     adb = find_adb()
     serial = device or get_connected_device(adb)

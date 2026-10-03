@@ -1,14 +1,14 @@
 import struct
 
-so_path = r'c:\Users\Ishan\Personal\Porfolio\Shadow Fight 2\modding\build_cache\apktool_src\lib\arm64-v8a\libil2cpp.so'
+so_path = r"c:\Users\Ishan\Personal\Porfolio\Shadow Fight 2\modding\build_cache\apktool_src\lib\arm64-v8a\libil2cpp.so"
 
-with open(so_path, 'rb') as f:
+with open(so_path, "rb") as f:
     code = f.read()
 
 # STR Wt, [Xn, #0x20]
 matches = []
 for pc in range(0, len(code) - 8, 4):
-    val = struct.unpack('<I', code[pc:pc+4])[0]
+    val = struct.unpack("<I", code[pc : pc + 4])[0]
     if (val & 0xFFF00000) == 0xB9002000:
         rt = val & 0x1F
         rn = (val >> 5) & 0x1F

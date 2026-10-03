@@ -69,13 +69,14 @@ from scripts.screenshot import capture_screenshot_bytes
 
 # 1. Grab raw PNG bytes in ~400ms
 png_bytes, elapsed = capture_screenshot_bytes(serial="emulator-5554")
-print(f"Captured in {elapsed*1000:.1f}ms")
+print(f"Captured in {elapsed * 1000:.1f}ms")
 
 # 2. Convert directly to PIL Image
 image = Image.open(io.BytesIO(png_bytes))
 
 # 3. Access pixels or convert to NumPy array for RL observation
 import numpy as np
+
 frame_array = np.array(image.convert("RGB"))  # Shape: (1080, 1920, 3)
 ```
 
