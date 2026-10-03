@@ -31,13 +31,19 @@ import subprocess
 from typing import Optional, Tuple
 
 try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+try:
     import frida
 except ImportError:
     frida = None
 
-DEFAULT_PORT = 27042
+DEFAULT_PORT = int(os.environ.get("FRIDA_PORT", "27042"))
 DEFAULT_PACKAGE = "com.nekki.catblasters"
-DEFAULT_ADB_TARGET = "127.0.0.1:5555"
+DEFAULT_ADB_TARGET = os.environ.get("ADB_CONNECT", "127.0.0.1:5555")
 
 WINDOWS_ADB_PATHS = [
     r"C:\Program Files\BlueStacks_nxt\HD-Adb.exe",

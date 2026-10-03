@@ -22,6 +22,12 @@ import subprocess
 import threading
 import frida
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 def get_frida_endpoint() -> tuple:
     host = os.environ.get("FRIDA_HOST", "127.0.0.1")
     port = int(os.environ.get("FRIDA_PORT", "27042"))

@@ -31,6 +31,12 @@ import json
 import argparse
 from typing import Optional, Dict, Any, Union
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 from scripts.game_actions import SF2GameActions
 from scripts.tick_controller import SF2TickController, ACTION_MAP
 

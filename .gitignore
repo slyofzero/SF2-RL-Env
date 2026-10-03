@@ -33,6 +33,8 @@ $RECYCLE.BIN/
 *.log
 *.tmp
 *.bak
+.env
+!.env.example
 
 # Android Packages & Archives (>100MB exceeds GitHub limits)
 *.apk

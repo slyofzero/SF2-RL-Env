@@ -1,0 +1,16 @@
+.git/
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.tmp
+*.bak
+*.apk
+*.xapk
+*.aab
+build_cache/
+modding/build_cache/
+bluestacks/apks/

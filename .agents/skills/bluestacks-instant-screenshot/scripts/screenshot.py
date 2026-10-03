@@ -13,6 +13,12 @@ import socket
 import argparse
 import subprocess
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 DEFAULT_ADB_PATHS = [
     r"C:\Program Files\BlueStacks_nxt\HD-Adb.exe",
     r"C:\Program Files (x86)\BlueStacks_nxt\HD-Adb.exe",

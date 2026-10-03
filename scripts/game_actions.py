@@ -46,6 +46,12 @@ import threading
 from typing import Optional, Dict, Any
 
 try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+try:
     import frida
 except ImportError:
     frida = None
