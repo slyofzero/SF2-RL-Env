@@ -39,6 +39,12 @@ except ImportError:
 
 from scripts.game_actions import SF2GameActions
 from scripts.tick_controller import SF2TickController, ACTION_MAP
+from scripts.engine_controller import (
+    SF2EngineController,
+    ENGINE_ACTION_MAP,
+    ENGINE_ACTION_LIST,
+)
+from scripts.start_frida_service import test_frida_connection, ensure_frida_bridge
 
 
 class ShadowFightEnv:
@@ -46,22 +52,54 @@ class ShadowFightEnv:
     Unified environment for Shadow Fight 2.
     """
 
-    def __init__(self, host: Optional[str] = None, port: Optional[int] = None):
+    def __init__(
+        self,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+        auto_start_frida: bool = True,
+    ):
         self.host = host or os.environ.get("FRIDA_HOST", "127.0.0.1")
         self.port = port or int(os.environ.get("FRIDA_PORT", "27042"))
+        self.auto_start_frida = auto_start_frida
 
         self.actions = SF2GameActions(host=self.host, port=self.port)
         self.clock = SF2TickController(host=self.host, port=self.port)
+        self.engine = SF2EngineController(host=self.host, port=self.port)
 
         self.state: Optional[Dict[str, Any]] = None
         self._is_connected = False
 
+    def is_server_on(self, timeout_sec: float = 1.5) -> bool:
+        """Checks whether the Frida connection server is on and reachable."""
+        online, _, _ = test_frida_connection(host=self.host, port=self.port, timeout_sec=timeout_sec)
+        return online
+
+    def ensure_server(self) -> bool:
+        """
+        Checks whether the Frida connection server is on.
+        If it is not on, turns it on using scripts/start_frida_service.py.
+        """
+        return ensure_frida_bridge(host=self.host, port=self.port, auto_boot=True)
+
     def connect(self) -> bool:
-        """Establishes connections to both game action and tick controller hooks."""
+        """
+        Firstly checks whether the Frida connection server is on or not.
+        If not on, turns on the server using start_frida_service,
+        and only then establishes connections to action and clock hooks.
+        """
         if not self._is_connected:
+            if self.auto_start_frida:
+                server_ok = self.ensure_server()
+                if not server_ok:
+                    raise ConnectionError(
+                        f"Unable to start or reach Frida server on {self.host}:{self.port}. "
+                        "Ensure emulator/container is running and game is booted."
+                    )
+
             ok_actions = self.actions.connect()
             ok_clock = self.clock.connect()
-            self._is_connected = ok_actions and ok_clock
+            ok_engine = self.engine.connect()
+            self._is_connected = ok_actions and ok_clock and ok_engine
         return self._is_connected
 
     def start(self, timeout: float = 20.0) -> Dict[str, Any]:
@@ -121,6 +159,28 @@ class ShadowFightEnv:
         self.state = self.clock.step(num_ticks=num_ticks, action=action)
         return self.state
 
+    def act(self, action: Union[str, int]) -> Dict[str, Any]:
+        """
+        Executes a combat or movement action in the game engine via SF2EngineController.
+
+        Args:
+            action: Action string (e.g. 'p', 'pp', 'k', 'kk', 'dp', 'sp', 'wp', 'ap',
+                    'dk', 'sk', 'wk', 'ak', 'w', 's', 'a', 'd', 'wd', 'wa', 'sd', 'sa',
+                    'dd', 'aa', 'stop', 'hold d', 'hold a') or discrete integer index (0..34).
+
+        Returns:
+            The resulting state dictionary after the action is executed.
+        """
+        if not self._is_connected:
+            self.connect()
+
+        ok = self.engine.act(action)
+        if not ok:
+            print(f"[WARN] Engine action '{action}' was not recognized.")
+
+        self.state = self.get_state()
+        return self.state
+
     def get_state(self) -> Dict[str, Any]:
         """
         Queries the current combat and simulation state without advancing ticks.
@@ -175,7 +235,7 @@ class ShadowFightEnv:
 
     def set_rounds(self, n: int) -> int:
         """
-        Dynamically patches the rounds-to-win threshold (1–99) in the running engine.
+        Dynamically patches the rounds-to-win threshold (1–65535) in the running engine.
         No APK repack needed. Takes effect from the next fight start.
         """
         if not self._is_connected:
@@ -198,6 +258,11 @@ class ShadowFightEnv:
             pass
         self.actions.disconnect()
         self.clock.disconnect()
+        if hasattr(self.engine, "session") and self.engine.session:
+            try:
+                self.engine.session.detach()
+            except Exception:
+                pass
         self._is_connected = False
 
 
@@ -245,7 +310,7 @@ def run_interactive(env: ShadowFightEnv):
     print("   pause             -> env.pause()")
     print("   resume            -> env.resume()")
     print("   exit              -> env.exit() (surrender / back to map)")
-    print("   rounds <N>        -> env.set_rounds(N) (1-99, takes effect next fight)")
+    print("   rounds <N>        -> env.set_rounds(N) (1-65535, takes effect next fight)")
     print("   rounds            -> env.get_rounds() (show current setting)")
     print("   state / status    -> env.get_state() (full telemetry JSON log)")
     print("   q / quit          -> Exit console")
@@ -319,11 +384,23 @@ def run_interactive(env: ShadowFightEnv):
             else:
                 cur = env.get_rounds()
                 print(f"[OK] Current rounds-to-win: {cur if cur is not None else 'default (unset this session)'}")
-        elif lower in ACTION_MAP:
-            st = env.step(steps=6, action=lower)
-            print(format_telemetry_line(st, prefix=f" -> [{lower.upper():4s} 6t]   "))
+        elif lower.startswith("act "):
+            parts = lower.split()
+            if len(parts) >= 2:
+                arg = parts[1]
+                try:
+                    act_val = int(arg) if arg.isdigit() else arg
+                    st = env.act(act_val)
+                    label = str(arg).upper()
+                    print(format_telemetry_line(st, prefix=f" -> [ACT: {label:4s}] "))
+                except Exception as e:
+                    print(f"[ERROR] Failed to act: {e}")
+        elif lower in ENGINE_ACTION_MAP:
+            st = env.act(lower)
+            label = str(lower).upper()
+            print(format_telemetry_line(st, prefix=f" -> [ACT: {label:4s}] "))
         else:
-            print(f"Unknown command: '{cmd}'. Try 'start', 'step <N>', 'freeze', 'speed <N>', 'rounds <N>', 'pause', 'exit', 'state', 'q'")
+            print(f"Unknown command: '{cmd}'. Try 'start', 'act <move>', 'step <N>', 'freeze', 'speed <N>', 'rounds <N>', 'pause', 'exit', 'state', 'q'")
 
 
 def main():
@@ -346,6 +423,10 @@ def main():
     step_p = subparsers.add_parser("step", help="env.step(steps=N, action=...)")
     step_p.add_argument("steps", type=int, nargs="?", default=1, help="Number of ticks to step (default: 1)")
     step_p.add_argument("action", type=str, nargs="?", default=None, help="Action code (e.g. p, k, dp, sp)")
+
+    # act
+    act_p = subparsers.add_parser("act", help="env.act(action): execute combat or movement action via engine_controller")
+    act_p.add_argument("action", help="Action name (p, k, dp, sp, wp, dk, sk, wk, dd, etc.) or discrete integer index (0..34)")
 
     # speed
     speed_p = subparsers.add_parser("speed", help="env.tick_speed(speed)")
@@ -384,6 +465,10 @@ def main():
             print(f"[SUCCESS] Unfrozen: {unfrozen}")
         elif args.command == "step":
             st = env.step(steps=args.steps, action=args.action)
+            print(json.dumps(st, indent=2))
+        elif args.command == "act":
+            act_val = int(args.action) if args.action.isdigit() else args.action
+            st = env.act(act_val)
             print(json.dumps(st, indent=2))
         elif args.command == "speed":
             spd = env.tick_speed(args.scale)

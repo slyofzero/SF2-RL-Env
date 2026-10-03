@@ -207,12 +207,13 @@ class SF2GameActions:
 
     def set_rounds(self, n: int) -> int:
         """
-        Dynamically patches the number of rounds required to win a match (1–99).
+        Dynamically patches the number of rounds required to win a match (1–65535).
         Takes effect on the next fight start. No APK repack required.
         """
         if not self.is_connected or not self.script:
             raise RuntimeError("Not connected to game engine.")
-        n = max(1, min(99, int(n)))
+        # ARM64 single-instruction MOVZ immediate max is 0xFFFF (65,535)
+        n = max(1, min(65535, int(n)))
         res = self.script.exports_sync.set_rounds(n)
         if not res.get("success"):
             raise RuntimeError(f"set_rounds failed: {res.get('error')}")

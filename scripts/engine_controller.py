@@ -178,6 +178,20 @@ class SF2EngineController:
             print(f"[ERROR] Set speed failed: {e}")
             return False
 
+    def act(self, action) -> bool:
+        """Executes a combat or movement action by name or integer index."""
+        if isinstance(action, int):
+            if 0 <= action < len(ENGINE_ACTION_LIST):
+                action = ENGINE_ACTION_LIST[action]
+            else:
+                return False
+
+        key = str(action).lower().strip().replace(" ", "")
+        handler = ENGINE_ACTION_MAP.get(key)
+        if handler:
+            return bool(handler(self))
+        return False
+
     def get_status(self):
         if not self.is_connected or not self.script:
             return None
@@ -185,6 +199,101 @@ class SF2EngineController:
             return self.script.exports_sync.get_status()
         except Exception:
             return None
+
+
+ENGINE_ACTION_MAP = {
+    # Basic Attacks (act_id: 9=punch, 10=kick)
+    "p": lambda c: c.attack(9, quad=0, hits=1),
+    "punch": lambda c: c.attack(9, quad=0, hits=1),
+    "pp": lambda c: c.attack(9, quad=0, hits=2),
+    "k": lambda c: c.attack(10, quad=0, hits=1),
+    "kick": lambda c: c.attack(10, quad=0, hits=1),
+    "kk": lambda c: c.attack(10, quad=0, hits=2),
+
+    # Compound Attacks
+    "dp": lambda c: c.attack(9, quad=3, hits=1),
+    "rightp": lambda c: c.attack(9, quad=3, hits=1),
+    "ap": lambda c: c.attack(9, quad=7, hits=1),
+    "leftp": lambda c: c.attack(9, quad=7, hits=1),
+    "sp": lambda c: c.attack(9, quad=5, hits=1),
+    "lowp": lambda c: c.attack(9, quad=5, hits=1),
+    "wp": lambda c: c.attack(9, quad=1, hits=1),
+    "upp": lambda c: c.attack(9, quad=1, hits=1),
+    "dk": lambda c: c.attack(10, quad=3, hits=1),
+    "rightk": lambda c: c.attack(10, quad=3, hits=1),
+    "ak": lambda c: c.attack(10, quad=7, hits=1),
+    "leftk": lambda c: c.attack(10, quad=7, hits=1),
+    "sk": lambda c: c.attack(10, quad=5, hits=1),
+    "lowk": lambda c: c.attack(10, quad=5, hits=1),
+    "wk": lambda c: c.attack(10, quad=1, hits=1),
+    "upk": lambda c: c.attack(10, quad=1, hits=1),
+
+    # Double Attacks
+    "dpp": lambda c: c.attack(9, quad=3, hits=2),
+    "app": lambda c: c.attack(9, quad=7, hits=2),
+    "spp": lambda c: c.attack(9, quad=5, hits=2),
+    "wpp": lambda c: c.attack(9, quad=1, hits=2),
+    "dkk": lambda c: c.attack(10, quad=3, hits=2),
+    "akk": lambda c: c.attack(10, quad=7, hits=2),
+    "skk": lambda c: c.attack(10, quad=5, hits=2),
+    "wkk": lambda c: c.attack(10, quad=1, hits=2),
+
+    # Diagonal Kicks
+    "wdk": lambda c: c.attack(10, quad=2, hits=1),
+    "wak": lambda c: c.attack(10, quad=8, hits=1),
+    "sdk": lambda c: c.attack(10, quad=4, hits=1),
+    "sak": lambda c: c.attack(10, quad=6, hits=1),
+
+    # Fast Movements (Dashes)
+    "dd": lambda c: c.dash(3),
+    "dash": lambda c: c.dash(3),
+    "dash_right": lambda c: c.dash(3),
+    "aa": lambda c: c.dash(7),
+    "dash_left": lambda c: c.dash(7),
+    "backflip": lambda c: c.dash(7),
+
+    # Compound Movements
+    "wd": lambda c: c.step(2, ticks=18),
+    "dw": lambda c: c.step(2, ticks=18),
+    "wa": lambda c: c.step(8, ticks=18),
+    "aw": lambda c: c.step(8, ticks=18),
+    "sd": lambda c: c.step(4, ticks=22),
+    "ds": lambda c: c.step(4, ticks=22),
+    "sa": lambda c: c.step(6, ticks=22),
+    "as": lambda c: c.step(6, ticks=22),
+
+    # Basic Movements
+    "w": lambda c: c.step(1, ticks=14),
+    "up": lambda c: c.step(1, ticks=14),
+    "jump": lambda c: c.step(1, ticks=14),
+    "s": lambda c: c.step(5, ticks=16),
+    "down": lambda c: c.step(5, ticks=16),
+    "duck": lambda c: c.step(5, ticks=16),
+    "a": lambda c: c.step(7, ticks=18),
+    "left": lambda c: c.step(7, ticks=18),
+    "d": lambda c: c.step(3, ticks=18),
+    "right": lambda c: c.step(3, ticks=18),
+
+    # Continuous & Stop
+    "stop": lambda c: c.stop(),
+    "noop": lambda c: c.stop(),
+    "neutral": lambda c: c.stop(),
+    "holdd": lambda c: c.hold(3),
+    "holdright": lambda c: c.hold(3),
+    "holda": lambda c: c.hold(7),
+    "holdleft": lambda c: c.hold(7),
+}
+
+ENGINE_ACTION_LIST = [
+    "noop", "p", "k", "w", "s", "a", "d",
+    "dp", "sp", "wp", "ap",
+    "dk", "sk", "wk", "ak",
+    "wd", "wa", "sd", "sa",
+    "dd", "aa",
+    "pp", "kk", "dpp", "spp", "wpp", "app",
+    "dkk", "skk", "wkk", "akk",
+    "wdk", "wak", "sdk", "sak",
+]
 
 def print_help():
     print("""

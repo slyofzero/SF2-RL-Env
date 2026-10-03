@@ -1,13 +1,13 @@
 services:
   sf2-harness:
     build: .
+    image: sf2-harness:latest
     container_name: sf2-harness
     environment:
-      # Target emulator / container settings
-      - ANDROID_SERIAL=127.0.0.1:5555
+      - ANDROID_SERIAL=host.docker.internal:5555
       - ADB_PATH=/usr/bin/adb
-      - ADB_CONNECT=127.0.0.1:5555
-      - FRIDA_HOST=127.0.0.1
+      - ADB_CONNECT=host.docker.internal:5555
+      - FRIDA_HOST=host.docker.internal
       - FRIDA_PORT=27042
       - FRIDA_DIRECT=0
     stdin_open: true

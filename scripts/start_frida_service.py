@@ -148,12 +148,18 @@ def setup_port_forward(adb: str, device: str, port: int = DEFAULT_PORT) -> bool:
         return False
 
 
-def test_frida_connection(port: int = DEFAULT_PORT, timeout_sec: float = 3.0) -> Tuple[bool, str, Optional[int]]:
-    """Pings Frida on the target port and retrieves process / gadget info."""
+def test_frida_connection(
+    host: Optional[str] = None,
+    port: int = DEFAULT_PORT,
+    timeout_sec: float = 3.0,
+) -> Tuple[bool, str, Optional[int]]:
+    """Pings Frida on the target host/port and retrieves process / gadget info."""
     if frida is None:
         return False, "frida Python package not installed (run uv pip install frida)", None
 
-    host = "127.0.0.1"
+    if host is None:
+        host = os.environ.get("FRIDA_HOST", "127.0.0.1")
+
     start_time = time.time()
     last_err = ""
     while time.time() - start_time < timeout_sec:
@@ -170,6 +176,71 @@ def test_frida_connection(port: int = DEFAULT_PORT, timeout_sec: float = 3.0) ->
             time.sleep(0.5)
 
     return False, last_err, None
+
+
+def ensure_frida_bridge(
+    host: Optional[str] = None,
+    port: int = DEFAULT_PORT,
+    auto_boot: bool = True,
+    package: str = DEFAULT_PACKAGE,
+    verbose: bool = True,
+) -> bool:
+    """
+    Checks if Frida connection server/gadget is online.
+    If not, automatically finds ADB, resolves device, boots the game if needed,
+    sets up port forwarding, and verifies connection.
+    """
+    if host is None:
+        host = os.environ.get("FRIDA_HOST", "127.0.0.1")
+
+    # 1. Quick probe: is Frida already responding?
+    online, info, _ = test_frida_connection(host=host, port=port, timeout_sec=1.5)
+    if online:
+        if verbose:
+            print(f"[Frida] Service is already ONLINE on {host}:{port} ({info})")
+        return True
+
+    if verbose:
+        print(f"[Frida] Service is not responding on {host}:{port}. Initializing bridge...")
+
+    # 2. Find ADB & Device
+    adb = find_adb()
+    device = get_connected_device(adb)
+    if not device:
+        adb_target = os.environ.get("ADB_CONNECT", DEFAULT_ADB_TARGET)
+        if verbose:
+            print(f"[Frida] Connecting to ADB target {adb_target}...")
+        subprocess.run([adb, "connect", adb_target], capture_output=True, timeout=5)
+        device = get_connected_device(adb)
+
+    if not device:
+        if verbose:
+            print(f"[Frida ERROR] No active Android device found via ADB.", file=sys.stderr)
+        return False
+
+    # 3. Check and optionally boot the game
+    running, pid = is_app_running(adb, device, package)
+    if not running and auto_boot:
+        if verbose:
+            print(f"[Frida] Game '{package}' is not running. Booting now...")
+        boot_app(adb, device, package)
+        time.sleep(5)
+        running, pid = is_app_running(adb, device, package)
+
+    # 4. Port forward if not direct mode
+    if os.environ.get("FRIDA_DIRECT") != "1":
+        setup_port_forward(adb, device, port)
+
+    # 5. Final verification check with retry
+    online, info, _ = test_frida_connection(host=host, port=port, timeout_sec=5.0)
+    if online:
+        if verbose:
+            print(f"[Frida] Successfully connected to {host}:{port}: {info}")
+        return True
+    else:
+        if verbose:
+            print(f"[Frida ERROR] Could not establish connection to {host}:{port}: {info}", file=sys.stderr)
+        return False
 
 
 def run_check(adb: str, port: int, auto_boot: bool = False) -> bool:

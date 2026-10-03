@@ -208,7 +208,9 @@ if (!il2cppBase) {
 
     function arm64Movz(reg, imm) {
         // MOVZ Wd, #imm  =>  0x52800000 | (imm << 5) | reg
-        return (0x52800000 | ((imm & 0xFFFF) << 5) | (reg & 0x1F)) >>> 0;
+        // ARM64 MOVZ immediate is 16-bit (0..65535). Clamp to 65535 to avoid bit-overflow.
+        var val = Math.max(1, Math.min(65535, imm));
+        return (0x52800000 | ((val & 0xFFFF) << 5) | (reg & 0x1F)) >>> 0;
     }
 
     function patchRounds(n) {
